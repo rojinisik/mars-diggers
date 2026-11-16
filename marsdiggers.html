@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mars Diggers</title>
+<style>
+  :root{
+    --ink:#fff3e6; --dim:#e8c4a4; --panel:rgba(8,16,26,.74); --line:rgba(120,220,255,.36); --cy:#7fe3ff;
+    --accent:#ff9a3c; --accent2:#ffd27a; --good:#8fe38f; --bad:#ff7a66;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#2a1a14;color:var(--ink);
+    font-family:'Rubik',system-ui,-apple-system,'Segoe UI',sans-serif;user-select:none;-webkit-user-select:none}
+  canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .hidden{display:none !important}
+
+  /* HUD */
+  #hud{position:fixed;inset:0;pointer-events:none}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;backdrop-filter:blur(4px);box-shadow:0 0 18px rgba(60,180,255,.12), inset 0 0 24px rgba(60,160,220,.06)}
+  h1,h3,.ttitle,#mission b,#goal span{font-family:'Orbitron','Rubik',sans-serif}
+  #stats{position:absolute;left:16px;top:16px;padding:12px 14px;min-width:230px}
+  #stats .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;font-size:14px;color:var(--dim)}
+  #stats .row b{color:var(--ink);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  #stats .row + .row{margin-top:6px}
+  #money{color:var(--accent2) !important}
+  .bar{height:9px;border-radius:6px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:7px}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffb35a,#ff7a3c);border-radius:6px;transition:width .12s}
+  .bar.full > i{background:linear-gradient(90deg,#ff7a66,#ff4a3c)}
+  #goal{position:absolute;left:50%;top:16px;transform:translateX(-50%);padding:9px 16px;text-align:center;min-width:260px}
+  #goal span{font-size:13px;color:var(--dim)}
+  #goal b{font-variant-numeric:tabular-nums}
+  #visor{position:absolute;inset:0;background:radial-gradient(ellipse 78% 74% at 50% 47%,transparent 60%,rgba(12,7,5,.30) 84%,rgba(8,5,3,.82) 100%),linear-gradient(125deg,rgba(255,255,255,.07) 0%,transparent 22%)}
+  #cross{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.85);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+  #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:8px 14px;font-size:15px;font-weight:500}
+  kbd{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--accent);color:#2a1206;font-family:inherit;font-weight:700;margin-right:6px}
+  #toast{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);padding:9px 16px;font-size:15px;opacity:0;transition:opacity .25s;white-space:normal;width:max-content;max-width:min(780px,88vw);text-align:center}
+  #toast.show{opacity:1}
+  #toast.warn{border-color:var(--bad);color:#ffd9d2}
+  #keys{position:absolute;right:16px;bottom:16px;padding:9px 12px;font-size:12px;color:var(--dim);line-height:1.7}
+  #keys b{color:var(--ink);font-weight:500}
+  #toolbar{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:6px}
+  #toolbar .slot{padding:6px 10px;font-size:12px;color:var(--dim);border-radius:9px;background:var(--panel);border:1px solid var(--line)}
+  #toolbar .slot.on{color:#2a1206;background:var(--accent);border-color:var(--accent);font-weight:700}
+  #toolbar .slot small{opacity:.7;margin-right:4px}
+
+  #mission{position:absolute;right:16px;top:16px;padding:10px 14px;width:290px;font-size:14px;line-height:1.45}
+  #mission b{display:block;font-size:11px;letter-spacing:.2em;color:var(--cy);margin-bottom:3px}
+  #mail{display:block;margin-top:6px;color:var(--accent2);animation:blink 1s steps(2) infinite}
+  /* Terminal */
+  #term{background:rgba(4,8,14,.7)}
+  .tcard{width:min(780px,94vw);max-height:90vh;overflow:auto;background:rgba(8,16,26,.96);border:1px solid rgba(110,220,255,.55);border-radius:6px;padding:18px 20px;
+    box-shadow:0 0 44px rgba(60,180,255,.25), inset 0 0 70px rgba(40,120,180,.08)}
+  .thead{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;margin-bottom:10px;border-bottom:1px solid rgba(110,220,255,.25);padding-bottom:10px}
+  .ttitle{font-size:20px;letter-spacing:.14em;color:var(--cy)}
+  .tsub{color:#9fb6c8;font-size:13.5px;margin-top:4px;line-height:1.45}
+  .msg{padding:10px 12px;border-left:3px solid var(--cy);margin:8px 0;background:rgba(255,255,255,.04);font-size:14.5px;line-height:1.5}
+  .msg.you{border-color:var(--accent)}
+  .msg small{display:block;color:#8fa6b6;letter-spacing:.12em;font-size:11px;margin-bottom:3px}
+  .pend{padding:10px 12px;margin:8px 0;border:1px dashed rgba(110,220,255,.4);font-size:13.5px;color:#bfe9ff}
+  .tcard .bar > i{background:linear-gradient(90deg,#39b6ff,#7fe3ff);transition:none}
+  .tcard button.btn{display:block;width:100%;text-align:left;margin:6px 0;white-space:normal}
+  .tcard .item button.btn{display:inline-block;width:auto;margin:0;white-space:nowrap}
+  .tcard button.launch{background:var(--good);text-align:center;font-size:18px;padding:14px;letter-spacing:.2em;font-family:'Orbitron','Rubik',sans-serif}
+  .cash{color:var(--accent2);font-weight:700}
+
+  /* Intro */
+  #cine{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+  #cockpit{position:absolute;inset:-24px}
+  #cockpit .win{position:absolute;left:9%;right:9%;top:9%;bottom:24%;border-radius:70px 70px 28px 28px;box-shadow:0 0 0 200vmax #15171c, inset 0 0 0 7px #3a3f4a, inset 0 0 70px rgba(0,0,0,.6)}
+  #cockpit .dash{position:absolute;left:0;right:0;bottom:8%;display:flex;gap:44px;justify-content:center;font-size:15px;color:#9fe0a8;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+  #cockpit .lamp{color:#ff5a4a;font-weight:700;animation:blink .5s steps(2) infinite}
+  @keyframes blink{50%{opacity:.15}}
+  #fade,#flash{position:fixed;inset:0;opacity:0;pointer-events:none}
+  #fade{background:#000;transition:opacity .45s} #flash{background:#fff3df;transition:opacity .7s}
+  #sub{position:fixed;left:0;right:0;bottom:15%;text-align:center;font-size:22px;font-weight:500;text-shadow:0 2px 10px #000,0 0 3px #000;pointer-events:none;padding:0 24px}
+  #story{position:fixed;left:50%;top:20%;transform:translateX(-50%);width:min(580px,90vw);padding:18px 22px;font-size:17px;line-height:1.55;text-align:center;pointer-events:none}
+  #story b{color:var(--accent2)}
+  .head svg{cursor:pointer}
+
+  /* Overlays */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 60%,rgba(120,50,20,.55),rgba(20,10,8,.88))}
+  #start{cursor:pointer;text-align:center;padding:24px}
+  #start h1{font-size:clamp(40px,8vw,84px);font-weight:900;margin:0;letter-spacing:.02em;line-height:1;
+    color:var(--accent2);text-shadow:0 4px 0 #a8431c,0 10px 30px rgba(0,0,0,.5)}
+  #start p.sub{font-size:18px;color:var(--dim);margin:14px 0 26px}
+  #start .go{display:inline-block;padding:13px 30px;border-radius:999px;background:var(--accent);color:#2a1206;font-weight:700;font-size:18px}
+  #start .ctl{margin:26px auto 0;max-width:560px;font-size:14px;color:var(--dim);line-height:2}
+  #start .ctl kbd{margin:0 4px 0 10px}
+  .lang{margin-top:22px;display:flex;gap:8px;justify-content:center}
+  .lang button{font:inherit;font-weight:700;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:rgba(8,16,26,.6);color:var(--dim);cursor:pointer}
+  .lang button.on{background:var(--accent);border-color:var(--accent);color:#2a1206}
+  #err{color:var(--bad);margin-top:16px;font-size:14px}
+
+  /* Shop */
+  #shop{background:rgba(20,10,8,.62)}
+  .card{width:min(860px,94vw);max-height:92vh;overflow:auto;background:rgba(8,16,26,.95);border:1px solid rgba(110,220,255,.55);border-radius:6px;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);padding:18px 20px 20px;user-select:none}
+  .head{display:flex;gap:14px;align-items:center}
+  .head svg{flex:none;width:92px;height:92px}
+  .bubble{flex:1;position:relative;background:#fff3e6;color:#3a1d10;border-radius:14px;padding:12px 16px;font-size:17px;font-weight:500;min-height:54px;display:flex;align-items:center}
+  .bubble:before{content:"";position:absolute;left:-10px;top:50%;margin-top:-9px;border:9px solid transparent;border-left:0;border-right:11px solid #fff3e6}
+  .x{flex:none;width:38px;height:38px;border-radius:50%;border:0;background:#1c3044;color:var(--ink);font-size:18px;cursor:pointer}
+  .x:hover{background:#2c5a78}
+  .sellrow{display:flex;gap:12px;align-items:center;margin:16px 0 6px;padding:12px 14px;border-radius:12px;background:rgba(120,200,255,.08)}
+  .sellrow .m{flex:1;font-size:15px;color:var(--dim)}
+  .sellrow .m b{color:var(--accent2);font-size:22px;font-variant-numeric:tabular-nums}
+  button.btn{font:inherit;font-weight:700;border:0;border-radius:10px;padding:9px 14px;cursor:pointer;background:var(--accent);color:#2a1206;white-space:nowrap}
+  button.btn:hover{filter:brightness(1.1)}
+  button.btn.big{padding:12px 18px;font-size:16px;background:var(--good)}
+  button.btn.ghost{background:#1c3044;color:var(--ink)}
+  button.btn.poor{background:#1c3044;color:#c9a088}
+  button.btn:disabled{background:transparent;color:var(--good);cursor:default;border:1px solid var(--good)}
+  .cols{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
+  @media (max-width:720px){.cols{grid-template-columns:1fr}}
+  h3{margin:14px 0 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2)}
+  .item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;background:rgba(120,200,255,.08);margin-bottom:7px}
+  .item .t{flex:1;min-width:0}
+  .item .t b{display:block;font-size:15px}
+  .item .t span{display:block;font-size:12px;color:var(--dim)}
+  .item .p{font-size:12px;color:var(--dim);text-align:right;white-space:nowrap}
+  .item .p b{display:block;color:var(--accent2);font-size:14px}
+  .foot{margin-top:10px;font-size:12px;color:var(--dim);text-align:center}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="visor"></div>
+  <div id="stats" class="panel">
+    <div class="row"><span data-t="Money">Money</span><b id="money">0 ₥</b></div>
+    <div class="row"><span id="bagLabel">Bag</span><b id="bag">0 / 20 kg</b></div>
+    <div class="bar" id="bagBar"><i></i></div>
+    <div class="row" style="margin-top:9px"><span data-t="Tool">Tool</span><b id="toolName">Spoon</b></div>
+  </div>
+  <div id="mission" class="panel"><b data-t="MISSION">MISSION</b><span id="obj"></span><span id="mail" class="hidden" data-t="New transmission from Earth">New transmission from Earth</span></div>
+  <div id="goal" class="panel">
+    <span><span data-t="Mountain removed:">Mountain removed:</span> <b id="pct">0.000%</b></span>
+    <div class="bar"><i id="pctBar"></i></div>
+  </div>
+  <div id="cross"></div>
+  <div id="prompt" class="panel hidden"></div>
+  <div id="toast" class="panel"></div>
+  <div id="toolbar"></div>
+  <div id="keys" class="panel">
+    <b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump<br>
+    <b>Click</b> dig (hold with drill) · <b>1-7 / Q</b> switch tool<br>
+    <b>E</b> use / enter · <b>F</b> vehicles · <b>M</b> mute<br>
+    <b>R</b> stuck? return to shop
+  </div>
+</div>
+
+<div id="cine" class="hidden"><div id="cockpit"><div class="win"></div><div class="dash"><span class="lamp" data-t="MASTER ALARM">MASTER ALARM</span><span>ALT <b id="alt">0</b> m</span><span data-t="ENTER: SKIP">ENTER: SKIP</span></div></div></div>
+<div id="fade"></div><div id="flash"></div><div id="sub"></div>
+<div id="story" class="panel hidden"></div>
+
+<div id="start" class="overlay">
+  <div>
+    <h1>MARS DIGGERS</h1>
+    <p class="sub" id="startSub">One mountain. One spoon. Infinite patience.</p>
+    <span class="go" id="startGo">Loading...</span>
+    <div class="lang"><button id="lgEn" type="button">English</button><button id="lgTr" type="button">Türkçe</button></div>
+    <div class="ctl" id="ctl">
+      <kbd>WASD</kbd>move <kbd>Mouse</kbd>look <kbd>Click</kbd>dig <kbd>E</kbd>shop <kbd>F</kbd>enter/exit vehicle <kbd>Space</kbd>jump <kbd>Shift</kbd>run
+    </div>
+    <div id="err"></div>
+  </div>
+</div>
+
+<div id="term" class="overlay hidden">
+  <div class="tcard">
+    <div class="thead"><div><div class="ttitle" id="termTitle"></div><div class="tsub" id="termSub"></div></div><button class="x" id="termClose" title="Close (E)">✕</button></div>
+    <div id="termBody"></div>
+    <div class="foot" data-t="FOOT_TERM"></div>
+  </div>
+</div>
+
+<div id="shop" class="overlay hidden">
+  <div class="card">
+    <div class="head">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <rect x="26" y="80" width="48" height="20" rx="6" fill="#7b5534"/>
+        <rect x="24" y="74" width="52" height="10" rx="5" fill="#f2f2f2"/>
+        <circle cx="50" cy="44" r="24" fill="#e2b48e"/>
+        <path d="M30 50 Q50 86 70 50 Q60 60 50 58 Q40 60 30 50Z" fill="#fff"/>
+        <path d="M38 52 Q44 46 50 52 Q56 46 62 52 Q56 57 50 54 Q44 57 38 52Z" fill="#f4f4f4" stroke="#ddd" stroke-width=".6"/>
+        <circle cx="42" cy="40" r="2.6" fill="#2a1a12"/><circle cx="58" cy="40" r="2.6" fill="#2a1a12"/>
+        <rect x="36" y="32" width="11" height="3" rx="1.5" fill="#fff" transform="rotate(-10 41 33)"/>
+        <rect x="53" y="32" width="11" height="3" rx="1.5" fill="#fff" transform="rotate(10 59 33)"/>
+        <circle cx="50" cy="46" r="3.4" fill="#d19a76"/>
+        <circle cx="50" cy="44" r="36" fill="rgba(170,225,255,.22)" stroke="#f2f2f2" stroke-width="3"/>
+        <path d="M24 26 Q34 12 48 10" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="3" stroke-linecap="round"/>
+        <line x1="78" y1="20" x2="86" y2="6" stroke="#ddd" stroke-width="2"/><circle cx="86" cy="6" r="3.5" fill="#ff5a4a"/>
+      </svg>
+      <div class="bubble" id="quote"></div>
+      <button class="x" id="shopClose" title="Close (E)">✕</button>
+    </div>
+    <div class="sellrow">
+      <div class="m"><span data-t="Your cash:">Your cash:</span> <b id="shopMoney">0 ₥</b></div>
+      <button class="btn big" id="sellBtn">Sell dirt</button>
+    </div>
+    <div class="cols">
+      <div><h3 data-t="Tools">Tools</h3><div id="toolList"></div></div>
+      <div>
+        <h3 data-t="Bag">Bag</h3><div id="bagBox"></div>
+        <h3 data-t="Heavy machinery">Heavy machinery</h3><div id="machBox"></div>
+      </div>
+    </div>
+    <div class="foot" data-t="FOOT_SHOP"></div>
+  </div>
+</div>
+
+<script>
+/* Hata raporlayıcı: oyun çökerse ekranın altında kırmızı kutuda nedenini gösterir */
+(function(){
+  var errs=[];
+  function show(){ try{ var e=document.getElementById('crash'); if(!e){ e=document.createElement('div'); e.id='crash';
+      e.style.cssText='position:fixed;left:10px;right:10px;bottom:10px;z-index:99999;background:#400;color:#fff;font:13px/1.5 monospace;padding:10px 12px;border:2px solid #f55;white-space:pre-wrap;user-select:text;-webkit-user-select:text';
+      document.body.appendChild(e); }
+    e.textContent='GAME ERROR - please send this text to Claude:\n'+errs.slice(0,5).join('\n'); }catch(_){} }
+  function add(m){ m=String(m).slice(0,400); if(errs.indexOf(m)<0 && errs.length<5){ errs.push(m); show(); } }
+  window.addEventListener('error',function(ev){ add((ev.message||'error')+'  @line '+(ev.lineno||'?')+':'+(ev.colno||'?')); });
+  window.addEventListener('unhandledrejection',function(ev){ add('promise: '+((ev.reason&&ev.reason.message)||ev.reason)); });
+  try{ var fl=document.createElement('link'); fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rubik:wght@400;500;700;900&display=swap'; document.head.appendChild(fl); }catch(_){}
+  var ce=console.error; console.error=function(){ try{ var t=Array.prototype.slice.call(arguments).join(' '); if(t.indexOf('THREE')>=0||t.indexOf('WebGL')>=0) add('console: '+t); }catch(_){} return ce.apply(console,arguments); };
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function __marsMain(){
+'use strict';
+const $ = id => document.getElementById(id);
+if (typeof THREE === 'undefined') { $('err').textContent = 'Could not load the 3D library. Check your connection and reload.'; return; }
+
+/* ============================== Ayarlar ============================== */
+const W = { cell:0.75, N:401, X0:-150, Z0:-200, CX:0, CZ:-50, R:118 };
+const N = W.N;
+const MX = 0, MZ = -70;                 // dağın merkezi
+const SHOP = { x:17, z:14 };
+const SHIP = { x:-8, z:33.5 };
+const SPAWN = { x:-8, z:28.2 };
+const BASE_Y = 0;                       // dükkânın durduğu zemin seviyesi
+const DENS = 20;                        // 1 m³ toprak = 20 kg
+const PRICE = 1;                        // kg başına ₥
+const GRAV = 3.72, JUMP = 4.3, EYE = 1.7;   // Mars yerçekimi
+
+const TOOLS = [
+  { id:'kasik',  name:'Spoon',   desc:'Designed for soup. Not for mountains.',        price:0,     r:1.15, kg:2.5, cd:0.36, reach:3.6 },
+  { id:'kepce',  name:'Ladle',   desc:'A spoon that started going to the gym.',       price:60,    r:1.30, kg:5, cd:0.38, reach:3.8 },
+  { id:'cekic',  name:'Hammer',  desc:'Every problem is a nail. Even a mountain.',    price:250,   r:1.50, kg:10, cd:0.42, reach:3.8 },
+  { id:'kurek',  name:'Shovel',  desc:'Finally, a tool that makes sense.',            price:900,   r:1.90, kg:24, cd:0.46, reach:4.2 },
+  { id:'kazma',  name:'Pickaxe', desc:"The mountain's worst nightmare.",              price:3000,  r:2.30, kg:55, cd:0.50, reach:4.4 },
+  { id:'matkap', name:'Drill',   desc:"Hold to dig. The neighbors can't complain. There are none.", price:10000, r:2.20, kg:14, cd:0.07, reach:4.8, hold:true },
+  { id:'hilti',  name:'Jackhammer', desc:'Two hands, forty kilos, zero subtlety. Hold to dig.', price:25000, r:2.6, kg:40, cd:0.07, reach:4.6, hold:true, heavy:true }
+];
+const TIP = { kasik:[0.57,0.05], kepce:[0.68,0.075], cekic:[0.66,0.07], kurek:[1.0,0.11], kazma:[0.84,0.09], matkap:[1.02,0.06], hilti:[1.42,0.07] };
+const VDEFS = [
+  { id:'borer',     name:'Mars Borer', desc:'A drivable drill the size of a bus. Hold to bore.',            price:60000,  r:3.6, kg:95,   cd:0.07, reach:13, cap:15000, hold:true,  eyePos:[0,3.62,0.15], speed:8.5 },
+  { id:'excavator', name:'Excavator',  desc:'One enormous scoop per click. Slow, but every bite is huge.',  price:150000, r:6.0, kg:4000, cd:1.5,  reach:16, cap:40000, hold:false, eyePos:[-0.78,2.72,-0.5], speed:7.0 }
+];
+const COLONY = { x:50, z:20 };
+const INT = { x:600, y:-300, z:600 };          // mekiğin içi (ayrı bir hacim)
+const SIGNAL = 38;                               // Dünya'ya tek yön sinyal süresi (sıkıştırılmış, saniye)
+const PARTS = [
+  { id:'struts', name:'Landing Struts',      desc:'Gets the shuttle off its belly.',            price:3000 },
+  { id:'hull',   name:'Hull Plating',        desc:'Covers the holes. Most of them.',            price:12000 },
+  { id:'wing',   name:'Port Wing',           desc:'The one that fell off.',                     price:30000 },
+  { id:'fin',    name:'Stabilizer Fin',      desc:'Keeps the pointy end pointing forward.',     price:60000 },
+  { id:'engine', name:'Fusion Engine Core',  desc:'Stops the smoke. Starts the flying.',        price:150000 },
+  { id:'nav',    name:'Navigation Computer', desc:'Knows where Earth is. You do not.',          price:250000 }
+];
+const CONVO = [
+  { id:'mayday', need:0, label:'Send MAYDAY: crashed, ship wrecked, have spoon',
+    text:'MAYDAY. Courier 7 is down on Mars. Shuttle wrecked. Pilot alive. Inventory: one spoon.',
+    reply:'Courier 7, this is Earth Control. Glad you are alive. Bad news: the rescue budget was spent on the office coffee machine. Good news, part one: right next to you stands Space Dust unit SD-1, an unmanned dirt-buying automat. Feed it dirt and it pays local credits, and you are standing beside a mountain of dirt. Good news, part two: Dustfall Colony, a short walk east, sells shuttle parts for those credits. Start with Landing Struts. P.S. Your delivery is now 214 days late.' },
+  { id:'struts', need:1, label:'Report: landing struts installed',
+    text:'Struts are on. The shuttle is standing up again. So am I, mostly.',
+    reply:'Copy, Courier 7. Engineering says your hull has "more holes than a budget meeting". Hull Plating next. About your "old man": we pulled the SD-1 service log. It has been signed "The Management" every single day for 41 years. We never sent any management.' },
+  { id:'hull', need:2, label:'Report: hull plating installed',
+    text:'Hull is patched. I can no longer see the mountain through the wall.',
+    reply:'Excellent. Legal reminds you that wings are "strongly recommended" for flight. Get the Port Wing. Also, for the record: the SD-1 automat was shipped without a speaker, a face, or a beard. Please get more sleep.' },
+  { id:'wing', need:3, label:'Report: wing reattached',
+    text:'Wing is back on. It only wobbles a little.',
+    reply:'Two wings! Luxury. Without a Stabilizer Fin you will fly like a shopping cart with one bad wheel. Fin next. Side note: the archive has a survey mission from 41 years ago. Four went out, three came home. The file only says "one stayed to mind the shop". Probably a typo.' },
+  { id:'fin', need:4, label:'Report: stabilizer fin installed',
+    text:'Fin installed. She almost looks like a shuttle again.',
+    reply:'Looking good, Courier 7. Now the hard part: the Fusion Engine Core. It is expensive. We suggest more dirt. A lot more dirt. Unrelated: somebody on Mars has been collecting a pension for 41 years. Accounting would like a word with your hallucination.' },
+  { id:'engine', need:5, label:'Report: engine core installed',
+    text:'Engine core is in. The smoke stopped. I kind of miss it.',
+    reply:'Engine telemetry is green across the board! Last item: the Navigation Computer. Without it you may arrive at Jupiter. Nobody wants to go to Jupiter. And off the record: if he is real, ask him whether he wants a ride home.' },
+  { id:'nav', need:6, label:'Report: all systems repaired',
+    text:'Navigation computer online. Every light on the board is green. Requesting permission to come home.',
+    reply:'All systems go, Courier 7. You are cleared for launch. The whole control room is cheering. Dave is crying. One last thing: we finally found your cargo manifest. The package you were delivering is addressed to "Space Dust, Mars. Attn: The Management". We are no longer sure about the hallucination theory. Come home.' }
+];
+const SMALLTALK = [
+  { id:'oldman',  label:'Ask who the old guy in the middle of Mars is',
+    text:'By the way, who is the old guy in the middle of Mars? Helmet, beard, tiny shop. He keeps telling jokes, guys.',
+    reply:'Negative, Courier 7. SD-1 is an unmanned vending unit. There is no old guy on Mars. Please stop making friends with hallucinations. ...Unless he gives discounts. Does he give discounts?' },
+  { id:'discount', after:'oldman', label:'Answer: no, he does not give discounts',
+    text:'Update on the hallucination: I asked about discounts. He laughed for a full minute and said no.',
+    reply:'Then he is definitely not one of ours. Our vending machines have never laughed at a customer. They just quietly keep the money. Please ask your hallucination for a receipt. For our records.' },
+  { id:'receipt', after:'discount', label:'Report: asked him for a receipt',
+    text:'He says the printer is broken. He also says to tell you that your last check bounced.',
+    reply:'We do not write checks to hallucinations. ...Accounting just went very quiet. They want to know how he knows about the check. Do not tell him anything else. Also, ask whether the discount is still off the table.' },
+  { id:'haggle', after:'receipt', label:'Report: tried to haggle on behalf of Earth',
+    text:'I asked again about the discount, officially, on behalf of Planet Earth. He says for Earth the price is double.',
+    reply:'Double?! ...Understood. Diplomatic relations with the hallucination are suspended. Off the record: Dave says to offer him a coupon. We do not have coupons. Dave will draw one.' },
+  { id:'joke', after:'oldman', label:'Forward one of his jokes to Earth',
+    text:'He insists I pass this on: "Why did the astronaut break up with the Moon? Needed more space."',
+    reply:'The control room voted. Eleven groans, one laugh. The laugh was Dave. Dave has been moved to a desk without a microphone. Please stop relaying jokes on the emergency channel. ...Send one more.' },
+  { id:'joke2', after:'joke', label:'Send one more joke, as requested',
+    text:'He says: "I rate this shop five stars. I can see about nine thousand from here."',
+    reply:'Twelve groans. Dave laughed again, from the hallway. We are forwarding these to the Comedy Review Board, which did not exist until this morning. For a vending machine, he has good timing.' },
+  { id:'weather', label:'Ask about the weather on Earth', text:'How is the weather back home?', reply:'Raining. You are not missing much. Forecast for your location: dust, followed by dust.' },
+  { id:'pizza',   label:'Request one (1) pizza',          text:'Requesting pizza delivery to Mars. Extra cheese.', reply:'Request received. Estimated delivery: 7 months. It will be cold. Tip is not included.' },
+  { id:'pizza2', after:'pizza', label:'Ask if the old man can deliver the pizza instead',
+    text:'Never mind the pizza. The old man says he delivers. He wants to know your address.',
+    reply:'DO NOT give the hallucination our address. ...What toppings does he have?' }
+];
+const BOT = {
+  hello: [ 'WELCOME TO PARTS DEPOT. I AM BOLT. I WAS PROGRAMMED TO SMILE. I CANNOT SMILE.', 'GREETINGS, HUMAN. YOUR SHUTTLE IS 94% SCRAP. I SELL THE OTHER 94%.', 'ALL SALES ARE FINAL. ALL RETURNS ARE LAUGHED AT. HA. HA.', 'I DO NOT ACCEPT DIRT. THE AUTOMAT ACCEPTS DIRT. I ACCEPT CREDITS.', 'PLEASE DO NOT TAP THE GLASS. THERE IS NO GLASS. PLEASE DO NOT TAP ME.', 'HUMOR MODULE: ONLINE. KNOCK KNOCK. ...WE HAVE NO DOORS. JOKE ABORTED.', 'THE DUST AUTOMAT HAS NO FACE. IF YOU SEE A FACE ON IT, REPORT TO MEDICAL.' ],
+  buy:   [ 'TRANSACTION COMPLETE. I FEEL NOTHING. THANK YOU.', 'PART DISPENSED. INSTALL IT AT YOUR SHUTTLE REPAIR STATION.', 'A WISE PURCHASE. I AM REQUIRED TO SAY THAT.' ],
+  poor:  [ 'INSUFFICIENT CREDITS. HAVE YOU CONSIDERED DIGGING FASTER.', 'YOU CANNOT AFFORD THIS. I RECOMMEND THE MOUNTAIN.' ],
+  locked:[ 'BUY THE PREVIOUS PART FIRST. ORDER MATTERS. ASK ANY ROBOT.' ]
+};
+const LOGS = [
+  'DAY 1. Departed Earth. Cargo: one (1) sealed package. Destination: Mars. Estimated trip: three days. The dispatcher may have misread "months".',
+  'DAY 97. Ate the last real meal. 117 days of "nutrient paste, beige" to go.',
+  'DAY 213. Mars in sight. The package label reads: SPACE DUST, MARS. ATTN: THE MANAGEMENT. FRAGILE. Contents: one coin mechanism, model SD-1.',
+  'DAY 214. Engine 2 made a new noise. Then no noise at all. Writing this quickly.',
+  'DAY 214, LATER. The package survived the landing. Earth says nobody lives at that address. Somebody over there is waving at me.'
+];
+const NPC_LINES = [
+  [ 'The dust automat? Lovely machine. Very polite.', 'An old man? At the automat? Friend, check your oxygen mix.', 'We never go near that kiosk at night. It hums. Sometimes it hums show tunes.' ],
+  [ 'New here? Parts at the depot, dirt at the automat. Hope is not sold anywhere.', 'I once saw the automat wave at me. I do not talk about it.', 'BOLT tells one joke a year. You just missed it.' ]
+];
+const BAGS = [ {cap:20,price:0},{cap:50,price:50},{cap:120,price:200},{cap:300,price:700},{cap:750,price:2200},{cap:2000,price:7000},{cap:5000,price:12000} ];
+const BAG_NAMES = ['Plastic Bag','Tote Bag','Backpack','Sack','Big Sack','Giant Sack','Space Container'];
+
+const QUOTES = {
+  hello: [
+    'Anything for sale, kid?',
+    "What're ya buyin'? ...Sorry. Old habit.",
+    'Welcome to Space Dust! You bring dirt, I bring disappointment-free prices.',
+    "Best shop on Mars! ...Might also be the only shop on Mars.",
+    'The helmet? It is called fashion, kid.',
+    'When I was your age, I dug that mountain with my fingernails.',
+    'Digging a mountain with a spoon... I respect it. I question your sanity, but I respect it.',
+    'Buy dirt, sell dirt... I am basically a real estate agent.',
+    'I was going to retire on Earth. Got on the wrong bus.',
+    'A discount? Hahaha. No.',
+    'Oxygen is free. Everything else costs money.',
+    "They say that mountain never ends. I agree. Buy a tool anyway.",
+    'Red dirt, orange dirt... I buy it all. I do not judge.',
+    'An alien came by asking for a spoon. Told him you got the last one.',
+    'Got some rare dirt, stranger?',
+    "Don't ask me to take the helmet off. It ruins my hair.",
+    'No rent, no taxes out here. No customers either.',
+    'You again? Just kidding. Nobody else ever comes.',
+    'Space dust in, space bucks out. Beautiful system.',
+    'I would shake your hand, but, you know. Vacuum.',
+    'My doctor said I need more iron. So I moved to a planet made of rust.',
+    'I told my wife I was going out for milk. That was eleven years ago. Long line.',
+    'Customer of the month again! The competition was not fierce.',
+    'This dirt is organic, gluten-free, and extremely dirt.',
+    'Why did the astronaut break up with the Moon? Needed more space. ...I have been alone a long time.',
+    'I rate this shop five stars. I can see about nine thousand from here.',
+    'Free shipping on all orders! You do the shipping.',
+    'I asked for a helmet with a cup holder. They sent a cup with a helmet holder.',
+    'My retirement plan is that mountain. My backup plan is also that mountain.',
+    'You dig, I sit. This is called management.',
+    'Careful with that spoon. It is the most advanced technology within fifty million kilometers.',
+    'Weather today: dusty. Tomorrow: dusty. Weekend outlook: you will never guess.',
+    'I once sold dirt to a man standing on dirt. Best day of my career.',
+    'Is it hot in here or is it just the complete lack of atmosphere?',
+    'Smile! ...I assume you are smiling. Hard to tell through two helmets.',
+    'Automat? Do I look like an automat to you? ...Do not answer that.',
+    'Earth says I do not exist? Tell Earth their last check bounced.',
+    'Forty-one years I have run this shop. Not one customer. Then you fall out of the sky.',
+    'People keep putting dirt in me... I mean, GIVING me dirt. Forget I said that.',
+    'I sign the service log every day. "The Management." That is me. I am the whole management.',
+    'Earth wants to know if I give discounts? Tell them: for Earth, the price is double.',
+    'A discount! Sure. Today only: everything costs exactly the same as yesterday.',
+    'I have a loyalty program. You stay loyal, I keep the prices.',
+    'Buy ten tools, get the eleventh at full price!'
+  ],
+  pkg: [ 'A package for "The Management"? That is ME! ...It is 214 days late. I am leaving a review.' ],
+  buy: [
+    'Fine choice! No refunds, by the way.',
+    'Enjoy. If you break it, I will happily sell you another.',
+    'Heh heh heh... Thank you!',
+    'That mountain is going to cry, kid.',
+    'Here is your receipt... printer is broken. Never mind.'
+  ],
+  poor: [
+    'No money, no tool. Universal law.',
+    'All you have in your pockets is dust. Which I would buy, to be fair.',
+    'Not enough cash, stranger!',
+    'I left my credit ledger on Earth. Sorry.'
+  ],
+  sell: [
+    'Lovely dirt! Weighing it now... the scale is honest, mostly.',
+    "Don't ask what I do with all this dirt.",
+    'Heh, more dirt. What a surprise.',
+    'Pleasure doing business! ...Always wanted to say that.',
+    'Good stuff. A bit dusty, but good.'
+  ],
+  empty: [ 'Your bag is empty, kid. Selling me air?', "I don't pay for empty bags. I am not that old yet." ],
+  shout: [
+    'Hey! Dirt guy! Over here!',
+    'I can hear you digging from here. I cannot, actually. No air. But I FEEL it.',
+    'That bag looks heavy. I know a place that buys dirt. It is me. I am the place.',
+    'Fresh dirt! Get your... no wait, I BUY the dirt. Still getting used to this.',
+    'Nice spoon work out there! Truly the Michelangelo of mud.',
+    'You missed a spot! ...It is the whole mountain. The spot is the whole mountain.'
+  ],
+  repair: [ 'One shuttle repair kit! It is mostly duct tape, but it is SPACE duct tape.', 'There. Good as new. Please do not look underneath.' ],
+  machine: [ 'Wow! My first excavator customer. Also my only customer, but still.', 'Parked it next to the shop. Scratch it and we are done.' ]
+};
+
+/* ============================== Durum ============================== */
+const S = {
+  money:0, soil:0, bag:0, tool:0, owned:[true,false,false,false,false,false,false], intro:0, it:0, roll:0, boomed:false, wreck:0, parts:[0,0,0,0,0,0], inside:false, modal:'', sentIds:{}, gotIds:{}, log:[], pending:[], unread:0, launched:false, installing:-1, installT:0, botLine:'', soldKg:0, visited:false, readLog:false, toldPkg:false, quoteRaw:'', subRaw:'', storyKey:'', ready:false, chase:false, warpT:0, warpFn:null, mvz:0, storyT:0, shoutT:12, rumbleT:0,
+  removedVol:0, totalVol:1,
+  px:SPAWN.x, py:0, pz:SPAWN.z, vy:0, yaw:0, pitch:-0.05, grounded:true,
+  mounted:null, started:false, shopOpen:false, locked:false, everLocked:false, noLock:false,
+  digging:false, click:false, swingT:-1, hitDone:false, clump:0, kick:0, cooldown:0, swing:0, bob:0, muted:false, time:0
+};
+const keys = Object.create(null);
+
+/* ============================== Dil (EN / TR) ============================== */
+const TR = /*TR_DICT*/{"Spoon": "Kaşık", "Designed for soup. Not for mountains.": "Çorba için tasarlandı. Dağ için değil.", "Ladle": "Kepçe", "A spoon that started going to the gym.": "Kaşığın spora başlamış hâli.", "Hammer": "Çekiç", "Every problem is a nail. Even a mountain.": "Her sorun çividir. Dağ da dâhil.", "Shovel": "Kürek", "Finally, a tool that makes sense.": "Sonunda mantıklı bir alet.", "Pickaxe": "Kazma", "The mountain's worst nightmare.": "Dağın en korkulu rüyası.", "Drill": "Matkap", "Hold to dig. The neighbors can't complain. There are none.": "Basılı tut, kazsın. Komşular şikâyet edemez. Komşu yok.", "Jackhammer": "Hilti", "Two hands, forty kilos, zero subtlety. Hold to dig.": "İki el, kırk kilo, sıfır incelik. Basılı tut, kazsın.", "Mars Borer": "Mars Burgusu", "A drivable drill the size of a bus. Hold to bore.": "Otobüs boyunda, sürülebilir bir matkap. Basılı tut, delsin.", "Excavator": "Ekskavatör", "One enormous scoop per click. Slow, but every bite is huge.": "Her tıkta tek ama dev bir kepçe. Yavaş, ama her lokması kocaman.", "Plastic Bag": "Poşet", "Tote Bag": "Bez Torba", "Backpack": "Sırt Çantası", "Sack": "Çuval", "Big Sack": "Büyük Çuval", "Giant Sack": "Dev Çuval", "Space Container": "Uzay Konteyneri", "Anything for sale, kid?": "Satılık bir şeyin var mı evlat?", "What're ya buyin'? ...Sorry. Old habit.": "Ne alıyon yabancı? ...Pardon. Eski alışkanlık.", "Welcome to Space Dust! You bring dirt, I bring disappointment-free prices.": "Space Dust'a hoş geldin! Sen toprağı getir, ben hayal kırıklığı içermeyen fiyatları.", "Best shop on Mars! ...Might also be the only shop on Mars.": "Mars'ın en iyi dükkânı! ...Tek dükkânı da olabilir.", "The helmet? It is called fashion, kid.": "Kask mı? Buna moda denir evlat.", "When I was your age, I dug that mountain with my fingernails.": "Ben senin yaşındayken o dağı tırnağımla kazıyordum.", "Digging a mountain with a spoon... I respect it. I question your sanity, but I respect it.": "Kaşıkla dağ kazmak... Saygı duyuyorum. Akıl sağlığından şüpheliyim ama saygı duyuyorum.", "Buy dirt, sell dirt... I am basically a real estate agent.": "Toprak al, toprak sat... Resmen emlakçıyım.", "I was going to retire on Earth. Got on the wrong bus.": "Dünya'da emekli olacaktım. Yanlış otobüse bindim.", "A discount? Hahaha. No.": "İndirim mi? Hahaha. Hayır.", "Oxygen is free. Everything else costs money.": "Oksijen bedava. Gerisi paralı.", "They say that mountain never ends. I agree. Buy a tool anyway.": "O dağ bitmez diyorlar. Katılıyorum. Sen yine de alet al.", "Red dirt, orange dirt... I buy it all. I do not judge.": "Kırmızı toprak, turuncu toprak... Hepsini alırım. Ayrım yapmam.", "An alien came by asking for a spoon. Told him you got the last one.": "Geçen bir uzaylı geldi, kaşık sordu. Son kaşığı sen aldın dedim.", "Got some rare dirt, stranger?": "Nadir toprağın var mı yabancı?", "Don't ask me to take the helmet off. It ruins my hair.": "Kaskı çıkarmamı isteme. Saçım bozuluyor.", "No rent, no taxes out here. No customers either.": "Burada kira yok, vergi yok. Müşteri de yok.", "You again? Just kidding. Nobody else ever comes.": "Yine mi sen? Şaka şaka. Başka gelen yok zaten.", "Space dust in, space bucks out. Beautiful system.": "Uzay tozu girer, uzay parası çıkar. Tertemiz sistem.", "I would shake your hand, but, you know. Vacuum.": "Elini sıkardım ama, malum. Vakum.", "My doctor said I need more iron. So I moved to a planet made of rust.": "Doktor demirim eksik dedi. Ben de pastan yapılmış bir gezegene taşındım.", "I told my wife I was going out for milk. That was eleven years ago. Long line.": "Hanıma süt almaya çıkıyorum demiştim. On bir yıl oldu. Kuyruk uzun.", "Customer of the month again! The competition was not fierce.": "Yine ayın müşterisi sensin! Rekabet pek çetin değildi.", "This dirt is organic, gluten-free, and extremely dirt.": "Bu toprak organik, glütensiz ve son derece toprak.", "Why did the astronaut break up with the Moon? Needed more space. ...I have been alone a long time.": "Astronot Ay'dan neden ayrılmış? Biraz mesafe lazımmış. ...Çok uzun zamandır yalnızım.", "I rate this shop five stars. I can see about nine thousand from here.": "Bu dükkâna beş yıldız veriyorum. Buradan dokuz bin tanesini görebiliyorum.", "Free shipping on all orders! You do the shipping.": "Tüm siparişlerde kargo bedava! Kargoyu sen taşıyorsun.", "I asked for a helmet with a cup holder. They sent a cup with a helmet holder.": "Bardaklıklı kask istedim. Kasklıklı bardak göndermişler.", "My retirement plan is that mountain. My backup plan is also that mountain.": "Emeklilik planım o dağ. Yedek planım da o dağ.", "You dig, I sit. This is called management.": "Sen kaz, ben oturayım. Buna yöneticilik denir.", "Careful with that spoon. It is the most advanced technology within fifty million kilometers.": "O kaşığa dikkat et. Elli milyon kilometre çapındaki en ileri teknoloji o.", "Weather today: dusty. Tomorrow: dusty. Weekend outlook: you will never guess.": "Bugün hava: tozlu. Yarın: tozlu. Hafta sonu: tahmin et.", "I once sold dirt to a man standing on dirt. Best day of my career.": "Bir keresinde toprağın üstünde duran adama toprak sattım. Kariyerimin zirvesiydi.", "Is it hot in here or is it just the complete lack of atmosphere?": "Burası mı sıcak, yoksa atmosfer mi hiç yok?", "Smile! ...I assume you are smiling. Hard to tell through two helmets.": "Gülümse! ...Gülümsediğini varsayıyorum. İki kaskın arkasından pek belli olmuyor.", "Automat? Do I look like an automat to you? ...Do not answer that.": "Otomat mı? Ben sana otomat gibi mi görünüyorum? ...Cevap verme.", "Earth says I do not exist? Tell Earth their last check bounced.": "Dünya ben yokum mu diyor? Söyle onlara, son çekleri karşılıksız çıktı.", "Forty-one years I have run this shop. Not one customer. Then you fall out of the sky.": "Kırk bir yıldır bu dükkânı işletiyorum. Bir tane müşteri gelmedi. Sonra sen gökten düştün.", "People keep putting dirt in me... I mean, GIVING me dirt. Forget I said that.": "İnsanlar içime toprak koyup duruyor... Yani bana toprak VERİYOR. Unut onu.", "I sign the service log every day. \"The Management.\" That is me. I am the whole management.": "Servis defterini her gün ben imzalarım. \"Yönetim.\" O benim. Yönetimin tamamı benim.", "A package for \"The Management\"? That is ME! ...It is 214 days late. I am leaving a review.": "\"Yönetim\"e paket mi var? O BENİM! ...214 gün gecikmiş. Yorum yazacağım.", "Fine choice! No refunds, by the way.": "Güzel seçim! Bu arada iade yok.", "Enjoy. If you break it, I will happily sell you another.": "Güle güle kullan. Kırarsan seve seve yenisini satarım.", "Heh heh heh... Thank you!": "He he he... Teşekkürler!", "That mountain is going to cry, kid.": "O dağ ağlayacak evlat.", "Here is your receipt... printer is broken. Never mind.": "Buyur fişin... yazıcı bozuk. Neyse.", "No money, no tool. Universal law.": "Para yoksa alet de yok. Evrensel yasa.", "All you have in your pockets is dust. Which I would buy, to be fair.": "Cebinde sadece toz var. Gerçi onu da alırım.", "Not enough cash, stranger!": "Paran yetmiyor yabancı!", "I left my credit ledger on Earth. Sorry.": "Veresiye defterimi Dünya'da unutmuşum. Kusura bakma.", "Lovely dirt! Weighing it now... the scale is honest, mostly.": "Mis gibi toprak! Tartıyorum... terazi dürüsttür, çoğunlukla.", "Don't ask what I do with all this dirt.": "Bu kadar toprağı ne yaptığımı sorma.", "Heh, more dirt. What a surprise.": "He, yine toprak. Ne sürpriz ama.", "Pleasure doing business! ...Always wanted to say that.": "Sizinle iş yapmak bir zevkti! ...Bunu hep söylemek istemiştim.", "Good stuff. A bit dusty, but good.": "İyi mal. Biraz tozlu ama iyi.", "Your bag is empty, kid. Selling me air?": "Torban boş evlat. Bana hava mı satacaksın?", "I don't pay for empty bags. I am not that old yet.": "Boş torbaya para vermem. Daha o kadar yaşlanmadım.", "Hey! Dirt guy! Over here!": "Hey! Toprakçı! Buraya gel!", "I can hear you digging from here. I cannot, actually. No air. But I FEEL it.": "Kazdığını buradan duyuyorum. Aslında duymuyorum. Hava yok. Ama HİSSEDİYORUM.", "That bag looks heavy. I know a place that buys dirt. It is me. I am the place.": "O torba ağır görünüyor. Toprak alan bir yer biliyorum. O yer benim. Ben o yerim.", "Fresh dirt! Get your... no wait, I BUY the dirt. Still getting used to this.": "Taze toprak! Gel vatandaş... dur, toprağı ben ALIYORUM. Hâlâ alışamadım.", "Nice spoon work out there! Truly the Michelangelo of mud.": "Kaşık işçiliğin harika! Tam bir çamur Michelangelo'su.", "You missed a spot! ...It is the whole mountain. The spot is the whole mountain.": "Bir yeri kaçırmışsın! ...Dağın tamamı. Kaçırdığın yer dağın tamamı.", "One shuttle repair kit! It is mostly duct tape, but it is SPACE duct tape.": "Bir adet mekik tamir kiti! Çoğu koli bandı ama UZAY koli bandı.", "There. Good as new. Please do not look underneath.": "Tamam. Sıfır gibi oldu. Lütfen altına bakma.", "Wow! My first excavator customer. Also my only customer, but still.": "Vay! İlk iş makinesi müşterim. Tek müşterim de sensin ama olsun.", "Parked it next to the shop. Scratch it and we are done.": "Dükkânın yanına park ettim. Çizersen bozuşuruz.", "WELCOME TO PARTS DEPOT. I AM BOLT. I WAS PROGRAMMED TO SMILE. I CANNOT SMILE.": "PARÇA DEPOSUNA HOŞ GELDİNİZ. BEN BOLT. GÜLÜMSEMEK ÜZERE PROGRAMLANDIM. GÜLÜMSEYEMİYORUM.", "GREETINGS, HUMAN. YOUR SHUTTLE IS 94% SCRAP. I SELL THE OTHER 94%.": "SELAMLAR, İNSAN. MEKİĞİNİN %94'Ü HURDA. BEN DİĞER %94'ÜNÜ SATIYORUM.", "ALL SALES ARE FINAL. ALL RETURNS ARE LAUGHED AT. HA. HA.": "SATIŞLAR KESİNDİR. İADE TALEPLERİNE GÜLÜNÜR. HA. HA.", "I DO NOT ACCEPT DIRT. THE AUTOMAT ACCEPTS DIRT. I ACCEPT CREDITS.": "TOPRAK KABUL ETMİYORUM. TOPRAĞI OTOMAT KABUL EDER. BEN KREDİ KABUL EDERİM.", "PLEASE DO NOT TAP THE GLASS. THERE IS NO GLASS. PLEASE DO NOT TAP ME.": "LÜTFEN CAMA VURMAYIN. CAM YOK. LÜTFEN BANA VURMAYIN.", "HUMOR MODULE: ONLINE. KNOCK KNOCK. ...WE HAVE NO DOORS. JOKE ABORTED.": "MİZAH MODÜLÜ: AKTİF. TAK TAK. ...KAPIMIZ YOK. ESPRİ İPTAL EDİLDİ.", "THE DUST AUTOMAT HAS NO FACE. IF YOU SEE A FACE ON IT, REPORT TO MEDICAL.": "TOZ OTOMATININ YÜZÜ YOKTUR. ÜZERİNDE YÜZ GÖRÜYORSANIZ REVİRE BAŞVURUN.", "TRANSACTION COMPLETE. I FEEL NOTHING. THANK YOU.": "İŞLEM TAMAMLANDI. HİÇBİR ŞEY HİSSETMİYORUM. TEŞEKKÜRLER.", "PART DISPENSED. INSTALL IT AT YOUR SHUTTLE REPAIR STATION.": "PARÇA TESLİM EDİLDİ. MEKİĞİNİZDEKİ TAMİR İSTASYONUNDA TAKINIZ.", "A WISE PURCHASE. I AM REQUIRED TO SAY THAT.": "AKILLICA BİR ALIŞVERİŞ. BUNU SÖYLEMEK ZORUNDAYIM.", "INSUFFICIENT CREDITS. HAVE YOU CONSIDERED DIGGING FASTER.": "YETERSİZ KREDİ. DAHA HIZLI KAZMAYI DÜŞÜNDÜNÜZ MÜ.", "YOU CANNOT AFFORD THIS. I RECOMMEND THE MOUNTAIN.": "BUNA PARANIZ YETMEZ. DAĞI TAVSİYE EDERİM.", "BUY THE PREVIOUS PART FIRST. ORDER MATTERS. ASK ANY ROBOT.": "ÖNCE BİR ÖNCEKİ PARÇAYI ALIN. SIRA ÖNEMLİDİR. HERHANGİ BİR ROBOTA SORUN.", "Landing Struts": "İniş Ayakları", "Gets the shuttle off its belly.": "Mekiği karnının üstünden kaldırır.", "Hull Plating": "Gövde Kaplaması", "Covers the holes. Most of them.": "Delikleri kapatır. Çoğunu.", "Port Wing": "Sol Kanat", "The one that fell off.": "Düşen kanat.", "Stabilizer Fin": "Dengeleyici Kuyruk", "Keeps the pointy end pointing forward.": "Sivri ucun önde kalmasını sağlar.", "Fusion Engine Core": "Füzyon Motor Çekirdeği", "Stops the smoke. Starts the flying.": "Dumanı durdurur. Uçuşu başlatır.", "Navigation Computer": "Navigasyon Bilgisayarı", "Knows where Earth is. You do not.": "Dünya'nın yerini bilir. Sen bilmezsin.", "Send MAYDAY: crashed, ship wrecked, have spoon": "MAYDAY gönder: düştüm, mekik hurda, kaşığım var", "MAYDAY. Courier 7 is down on Mars. Shuttle wrecked. Pilot alive. Inventory: one spoon.": "MAYDAY. Courier 7 Mars'a düştü. Mekik hurda. Pilot hayatta. Envanter: bir kaşık.", "Courier 7, this is Earth Control. Glad you are alive. Bad news: the rescue budget was spent on the office coffee machine. Good news, part one: right next to you stands Space Dust unit SD-1, an unmanned dirt-buying automat. Feed it dirt and it pays local credits, and you are standing beside a mountain of dirt. Good news, part two: Dustfall Colony, a short walk east, sells shuttle parts for those credits. Start with Landing Struts. P.S. Your delivery is now 214 days late.": "Courier 7, burası Dünya Kontrol. Hayatta olmana sevindik. Kötü haber: kurtarma bütçesi ofisin kahve makinesine harcandı. İyi haber, birinci kısım: hemen yanında Space Dust SD-1 duruyor; personelsiz, toprak alan bir otomat. İçine toprak at, yerel kredi öder; sen de tam bir toprak dağının yanındasın. İyi haber, ikinci kısım: kısa bir yürüyüşle doğundaki Dustfall Colony o kredilerle mekik parçası satıyor. İniş Ayakları ile başla. Not: Teslimatın şu an 214 gün gecikmiş durumda.", "Report: landing struts installed": "Rapor: iniş ayakları takıldı", "Struts are on. The shuttle is standing up again. So am I, mostly.": "Ayaklar takıldı. Mekik yeniden ayakta. Ben de öyle, aşağı yukarı.", "Copy, Courier 7. Engineering says your hull has \"more holes than a budget meeting\". Hull Plating next. About your \"old man\": we pulled the SD-1 service log. It has been signed \"The Management\" every single day for 41 years. We never sent any management.": "Anlaşıldı Courier 7. Mühendislik, gövdende \"bütçe toplantısından çok delik\" olduğunu söylüyor. Sırada Gövde Kaplaması var. Şu \"yaşlı adam\" meselesine gelince: SD-1'in servis defterine baktık. 41 yıldır her gün \"Yönetim\" diye imzalanmış. Biz oraya hiç yönetim göndermedik.", "Report: hull plating installed": "Rapor: gövde kaplaması takıldı", "Hull is patched. I can no longer see the mountain through the wall.": "Gövde yamandı. Artık duvardan dağı göremiyorum.", "Excellent. Legal reminds you that wings are \"strongly recommended\" for flight. Get the Port Wing. Also, for the record: the SD-1 automat was shipped without a speaker, a face, or a beard. Please get more sleep.": "Harika. Hukuk departmanı, uçuş için kanatların \"şiddetle tavsiye edildiğini\" hatırlatıyor. Sol Kanat'ı al. Bu arada kayıtlara geçsin: SD-1 otomatı hoparlörsüz, yüzsüz ve sakalsız sevk edildi. Lütfen biraz daha uyu.", "Report: wing reattached": "Rapor: kanat yerine takıldı", "Wing is back on. It only wobbles a little.": "Kanat yerinde. Sadece birazcık sallanıyor.", "Two wings! Luxury. Without a Stabilizer Fin you will fly like a shopping cart with one bad wheel. Fin next. Side note: the archive has a survey mission from 41 years ago. Four went out, three came home. The file only says \"one stayed to mind the shop\". Probably a typo.": "İki kanat! Lüks. Dengeleyici Kuyruk olmadan bir tekeri bozuk market arabası gibi uçarsın. Sırada kuyruk var. Dipnot: arşivde 41 yıl önceki bir keşif görevi çıktı. Dört kişi gitmiş, üçü dönmüş. Dosyada sadece \"biri dükkâna bakmak için kaldı\" yazıyor. Muhtemelen yazım hatası.", "Report: stabilizer fin installed": "Rapor: dengeleyici kuyruk takıldı", "Fin installed. She almost looks like a shuttle again.": "Kuyruk takıldı. Neredeyse yine mekiğe benzedi.", "Looking good, Courier 7. Now the hard part: the Fusion Engine Core. It is expensive. We suggest more dirt. A lot more dirt. Unrelated: somebody on Mars has been collecting a pension for 41 years. Accounting would like a word with your hallucination.": "İyi gidiyorsun Courier 7. Şimdi zor kısım: Füzyon Motor Çekirdeği. Pahalı. Daha fazla toprak öneriyoruz. Çok daha fazla toprak. Konuyla ilgisiz: Mars'ta biri 41 yıldır emekli maaşı alıyor. Muhasebe, halüsinasyonunla bir görüşmek istiyor.", "Report: engine core installed": "Rapor: motor çekirdeği takıldı", "Engine core is in. The smoke stopped. I kind of miss it.": "Motor çekirdeği yerinde. Duman kesildi. Biraz özledim sanki.", "Engine telemetry is green across the board! Last item: the Navigation Computer. Without it you may arrive at Jupiter. Nobody wants to go to Jupiter. And off the record: if he is real, ask him whether he wants a ride home.": "Motor telemetrisi baştan sona yeşil! Son parça: Navigasyon Bilgisayarı. O olmadan Jüpiter'e varabilirsin. Kimse Jüpiter'e gitmek istemez. Bir de, aramızda kalsın: gerçekse, eve bırakılmak ister mi diye bir sor.", "Report: all systems repaired": "Rapor: tüm sistemler onarıldı", "Navigation computer online. Every light on the board is green. Requesting permission to come home.": "Navigasyon bilgisayarı devrede. Paneldeki bütün ışıklar yeşil. Eve dönüş izni istiyorum.", "All systems go, Courier 7. You are cleared for launch. The whole control room is cheering. Dave is crying. One last thing: we finally found your cargo manifest. The package you were delivering is addressed to \"Space Dust, Mars. Attn: The Management\". We are no longer sure about the hallucination theory. Come home.": "Tüm sistemler hazır Courier 7. Kalkış iznin var. Bütün kontrol odası alkışlıyor. Dave ağlıyor. Son bir şey: kargo manifestonu nihayet bulduk. Taşıdığın paketin üzerinde \"Space Dust, Mars. Yönetim'in dikkatine\" yazıyor. Halüsinasyon teorisinden artık pek emin değiliz. Eve gel.", "Tell Earth the automat is actually an old man": "Dünya'ya otomatın aslında yaşlı bir adam olduğunu söyle", "About that automat. There is no automat. There is an old man in a space helmet, selling tools and telling jokes.": "Şu otomat meselesi. Otomat falan yok. Uzay kasklı yaşlı bir adam var; alet satıyor, espri yapıyor.", "Negative, Courier 7. SD-1 is an unmanned vending unit. There is no old man on Mars. Please stop making friends with hallucinations. ...Unless he gives discounts. Does he give discounts?": "Olumsuz Courier 7. SD-1 personelsiz bir satış otomatıdır. Mars'ta yaşlı adam yok. Lütfen halüsinasyonlarla arkadaşlık kurmayı bırak. ...Tabii indirim yapmıyorsa. İndirim yapıyor mu?", "Ask about the weather on Earth": "Dünya'da hava nasıl diye sor", "How is the weather back home?": "Memlekette hava nasıl?", "Raining. You are not missing much. Forecast for your location: dust, followed by dust.": "Yağmurlu. Pek bir şey kaçırmıyorsun. Bulunduğun bölge için tahmin: toz, ardından toz.", "Request one (1) pizza": "Bir (1) adet pizza iste", "Requesting pizza delivery to Mars. Extra cheese.": "Mars'a pizza siparişi veriyorum. Bol peynirli.", "Request received. Estimated delivery: 7 months. It will be cold. Tip is not included.": "Talep alındı. Tahmini teslimat: 7 ay. Soğumuş olacak. Bahşiş dâhil değildir.", "DAY 1. Departed Earth. Cargo: one (1) sealed package. Destination: Mars. Estimated trip: three days. The dispatcher may have misread \"months\".": "1. GÜN. Dünya'dan ayrıldım. Kargo: bir (1) adet mühürlü paket. Varış: Mars. Tahmini yolculuk: üç gün. Sevk memuru \"ay\"ı yanlış okumuş olabilir.", "DAY 97. Ate the last real meal. 117 days of \"nutrient paste, beige\" to go.": "97. GÜN. Son gerçek yemeği yedim. Önümde 117 günlük \"besin macunu, bej\" var.", "DAY 213. Mars in sight. The package label reads: SPACE DUST, MARS. ATTN: THE MANAGEMENT. FRAGILE. Contents: one coin mechanism, model SD-1.": "213. GÜN. Mars göründü. Paketin etiketinde şu yazıyor: SPACE DUST, MARS. YÖNETİM'İN DİKKATİNE. KIRILIR. İçindekiler: bir adet jeton mekanizması, model SD-1.", "DAY 214. Engine 2 made a new noise. Then no noise at all. Writing this quickly.": "214. GÜN. İki numaralı motor yeni bir ses çıkardı. Sonra hiç ses çıkarmadı. Bunu aceleyle yazıyorum.", "DAY 214, LATER. The package survived the landing. Earth says nobody lives at that address. Somebody over there is waving at me.": "214. GÜN, DAHA SONRA. Paket inişten sağ çıktı. Dünya, o adreste kimsenin yaşamadığını söylüyor. Oradan biri bana el sallıyor.", "The dust automat? Lovely machine. Very polite.": "Toz otomatı mı? Çok tatlı makine. Çok da kibar.", "An old man? At the automat? Friend, check your oxygen mix.": "Yaşlı adam mı? Otomatta mı? Dostum, oksijen karışımını bir kontrol et.", "We never go near that kiosk at night. It hums. Sometimes it hums show tunes.": "Geceleri o kulübenin yanına gitmeyiz. Vızıldıyor. Bazen de türkü mırıldanıyor.", "New here? Parts at the depot, dirt at the automat. Hope is not sold anywhere.": "Yeni misin? Parça depoda, toprak otomatta. Umut hiçbir yerde satılmıyor.", "I once saw the automat wave at me. I do not talk about it.": "Bir keresinde otomat bana el salladı. Bu konuyu konuşmuyorum.", "BOLT tells one joke a year. You just missed it.": "BOLT yılda bir espri yapar. Az önce kaçırdın.", "Mars orbit. Day 214 of a \"three-day\" delivery run.": "Mars yörüngesi. \"Üç günlük\" bir teslimatın 214. günü.", "MASTER ALARM: ...everything, apparently.": "ANA ALARM: ...her şey, görünüşe göre.", "Engine 2 has left the chat.": "İki numaralı motor sohbetten ayrıldı.", "Brace for landing. Or whatever this is.": "İnişe hazırlan. Ya da bu her neyse ona.", "Use comms console": "Haberleşme konsolunu kullan", "Repair station": "Tamir istasyonu", "Inspect cryo pod": "Kriyo kapsülü incele", "Coffee machine": "Kahve makinesi", "Read flight log": "Uçuş günlüğünü oku", "KEYS_HTML": "<b>WASD<\/b> yürü · <b>Shift<\/b> koş · <b>Space<\/b> zıpla<br><b>Tık<\/b> kaz (matkap / hilti: basılı tut) · <b>1-7 / Q<\/b> alet değiştir<br><b>E<\/b> kullan / konuş · <b>F<\/b> araçlar · <b>V<\/b> araç kamerası<br><b>R<\/b> sıkıştın mı? dükkâna dön · <b>M<\/b> ses · <b>L<\/b> dil", "CTL_HTML": "<kbd>WASD<\/kbd>yürü <kbd>Fare<\/kbd>bak <kbd>Tık<\/kbd>kaz <kbd>E<\/kbd>kullan <kbd>F<\/kbd>araca bin/in <kbd>Space<\/kbd>zıpla <kbd>Shift<\/kbd>koş <kbd>L<\/kbd>dil", "FOOT_SHOP": "Kapatmak için <b>E<\/b> · İade yok. Veresiye yok. İstisna yok.", "FOOT_TERM": "Kapatmak için <b>E<\/b>", "SHUTTLE SYSTEMS": "MEKİK SİSTEMLERİ", "[ OK ]": "[TAMAM]", "[READY]": "[HAZIR]", "[FAIL]": "[ARIZA]", "COMMS LINK": "HABERLEŞME", "{0} NEW MESSAGE": "{0} YENİ MESAJ", "SIGNAL IN TRANSIT": "SİNYAL YOLDA", "STANDBY": "BEKLEMEDE", "EARTH: 12.5 LIGHT-MIN": "DÜNYA: 12,5 IŞIK DAKİKASI", "PRESS E TO OPEN": "AÇMAK İÇİN E", "Emergency power only. The cockpit is at the front. To leave, walk back out through the hatch.": "Yalnızca acil durum gücü var. Kokpit ön tarafta. Çıkmak için kapaktan geri yürü.", "Free play: finish off the mountain.": "Serbest oyun: dağı bitir.", "Walk up the ramp into your shuttle and contact Earth from the cockpit.": "Rampadan mekiğine çık ve kokpitten Dünya ile iletişime geç.", "Sell dirt at Space Dust, then buy {0} at Dustfall Colony ({1} ₥).": "Space Dust'ta toprak sat, sonra Dustfall Colony'den {0} al ({1} ₥).", "Install {0} at the repair station inside your shuttle.": "{0} parçasını mekiğinin içindeki tamir istasyonunda tak.", "All systems repaired. Launch from the cockpit comms console!": "Tüm sistemler onarıldı. Kokpitteki haberleşme konsolundan kalkış yap!", "Incoming transmission from Earth. Read it at the cockpit comms.": "Dünya'dan mesaj geldi. Kokpitteki haberleşme konsolundan oku.", "Your signal is crossing space to Earth... arrives in {0} s": "Sinyalin uzayı aşıp Dünya'ya gidiyor... varmasına {0} sn", "Earth received it. The reply is on its way back... arrives in {0} s": "Dünya mesajını aldı. Cevap geri dönüş yolunda... varmasına {0} sn", "DEEP SPACE COMMS": "DERİN UZAY HABERLEŞMESİ", "Earth is 12.5 light-minutes away. Nothing you send arrives instantly, and neither does the answer. (Time compressed: {0} s each way.)": "Dünya 12,5 ışık dakikası uzakta. Gönderdiğin hiçbir şey anında ulaşmaz, cevap da öyle. (Zaman sıkıştırıldı: tek yön {0} sn.)", "SYSTEM": "SİSTEM", "No messages yet. The antenna still works. Earth should probably know you crashed.": "Henüz mesaj yok. Anten hâlâ çalışıyor. Dünya'nın düştüğünü bilmesi iyi olur.", "YOU  >>  EARTH CONTROL": "SEN  >>  DÜNYA KONTROL", "EARTH CONTROL  >>  YOU": "DÜNYA KONTROL  >>  SEN", "LAUNCH": "KALKIŞ", "Send a message": "Mesaj gönder", "Nothing new to report. Repair something first.": "Bildirecek yeni bir şey yok. Önce bir şeyi onar.", "DUSTFALL PARTS DEPOT": "DUSTFALL PARÇA DEPOSU", "Your credits:": "Kredin:", "Installed": "Takıldı", "In cargo": "Kargoda", "Locked": "Kilitli", "Buy": "Satın al", "shuttle part": "mekik parçası", "Bought parts go to your cargo. Install them at the repair station inside your shuttle.": "Satın alınan parçalar kargona gider. Mekiğinin içindeki tamir istasyonunda tak.", "REPAIR STATION": "TAMİR İSTASYONU", "Parts are sold at Dustfall Colony, east of Space Dust (blue beacon). Installed: {0} / {1}": "Parçalar Space Dust'ın doğusundaki Dustfall Colony'de satılır (mavi ışık sütunu). Takılan: {0} / {1}", "Installing... {0}%": "Takılıyor... %{0}", "Install": "Tak", "Missing": "Eksik", "FLIGHT LOG: COURIER 7": "UÇUŞ GÜNLÜĞÜ: COURIER 7", "Cargo: one (1) sealed package. Recipient: unknown.": "Kargo: bir (1) adet mühürlü paket. Alıcı: bilinmiyor.", "LIFTOFF": "KALKIŞ", "COURIER 7 FLIGHT LOG": "COURIER 7 UÇUŞ GÜNLÜĞÜ", "The repaired shuttle shakes, coughs, and climbs out of the Martian dust. Below, next to a slightly smaller mountain, an old man in a helmet waves from a shop that Earth still insists is a vending machine.": "Onarılan mekik sarsılıyor, öksürüyor ve Mars'ın tozundan yükseliyor. Aşağıda, biraz küçülmüş bir dağın yanında, Dünya'nın hâlâ otomat olduğunda ısrar ettiği bir dükkândan kasklı yaşlı bir adam el sallıyor.", "Welcome home, Courier 7. Your delivery is 219 days late. The recipient left a review: \"Slow. Wrecked the parking lot. Good with a spoon. One star.\"": "Eve hoş geldin Courier 7. Teslimatın 219 gün gecikti. Alıcı yorum bırakmış: \"Yavaş. Otoparkı mahvetti. Kaşıkla arası iyi. Bir yıldız.\"", "Dirt sold: {0} kg  ·  Mountain removed: {1}%  ·  Mission time: {2}": "Satılan toprak: {0} kg  ·  Kazılan dağ: %{1}  ·  Görev süresi: {2}", "Turn around and keep digging (free play)": "Geri dön ve kazmaya devam et (serbest oyun)", "{0} installed! Report it to Earth from the cockpit.": "{0} takıldı! Kokpitten Dünya'ya bildir.", "Cryo pod: OUT OF ORDER. Like everything else on this ship.": "Kriyo kapsül: ARIZALI. Bu gemideki her şey gibi.", "The coffee machine survived the crash. It is the only thing that did.": "Kahve makinesi kazadan sağ çıktı. Sağ çıkan tek şey o.", "Colonist: \"{0}\"": "Kolonici: \"{0}\"", "{0} hopper": "{0} haznesi", "Sell dirt: {0} kg → {1} ₥": "Toprağı sat: {0} kg → {1} ₥", "No dirt to sell": "Satacak toprak yok", "Equipped": "Elinde", "Equip": "Kuşan", "Free": "Bedava", "kg/s": "kg/sn", "kg/hit": "kg/vuruş", "capacity": "kapasite", "Upgrade": "Yükselt", "{0} kg, the biggest there is": "{0} kg, bundan büyüğü yok", "Hopper: {0} kg": "Hazne: {0} kg", "kg/scoop": "kg/kepçe", "Parked next to the shop. Walk up to it and press F.": "Dükkânın yanında park hâlinde. Yanına gidip F'ye bas.", "Owned": "Senin", "Paused": "Duraklatıldı", "One mountain. One spoon. Infinite patience.": "Bir dağ. Bir kaşık. Sonsuz sabır.", "Loading...": "Yükleniyor...", "Click to resume": "Devam etmek için tıkla", "Click to start": "Başlamak için tıkla", "Back at Space Dust.": "Space Dust'a döndün.", "Sound off": "Ses kapalı", "Sound on": "Ses açık", "WASD to drive, hold click to bore. F: get out. V: camera.": "WASD ile sür, tıkı basılı tutup del. F: in. V: kamera.", "WASD to drive, click for one big scoop. F: get out. V: camera.": "WASD ile sür, her tıkta tek büyük kepçe. F: in. V: kamera.", "An invisible force stops you... You cannot go any further.": "Görünmez bir güç seni durduruyor... Daha öteye gidemezsin.", "Hopper full! Drive to Space Dust and sell.": "Hazne dolu! Space Dust'a sür ve sat.", "Bag full! Go sell your dirt at Space Dust.": "Torba dolu! Git toprağını Space Dust'ta sat.", "Touchdown. Technically.": "Yere indik. Teknik olarak.", "You made it out. The shuttle is making a funny noise...": "Dışarı çıkmayı başardın. Mekikten tuhaf bir ses geliyor...", "Uh-oh.": "Eyvah.", "<b>Your shuttle is wrecked.<\/b><br>All you saved from the cockpit is <b>one spoon<\/b>. But emergency power is still on: walk back up the ramp and <b>call Earth from the cockpit<\/b>.": "<b>Mekiğin hurdaya döndü.<\/b><br>Kokpitten kurtarabildiğin tek şey <b>bir kaşık<\/b>. Ama acil durum gücü hâlâ açık: rampadan geri çık ve <b>kokpitten Dünya'yı ara<\/b>.", "Enter Space Dust": "Space Dust'a gir", "Parts Depot": "Parça Deposu", "Talk": "Konuş", "Get in the {0}": "{0} aracına bin", "Shopkeeper: \"{0}\"": "Dükkâncı: \"{0}\"", "Too hard to dig here. Only the mountain can be dug, down to shop level.": "Burası kazılamayacak kadar sert. Yalnızca dağ kazılır, o da dükkân seviyesine kadar.", "Money": "Para", "Tool": "Alet", "MISSION": "GÖREV", "New transmission from Earth": "Dünya'dan yeni mesaj", "Mountain removed:": "Dağın kazılan kısmı:", "MASTER ALARM": "ANA ALARM", "ENTER: SKIP": "ENTER: GEÇ", "Your cash:": "Kasan:", "Tools": "Aletler", "Bag": "Torba", "Heavy machinery": "Ağır makineler"};
+const EN = {
+  KEYS_HTML:'<b>WASD</b> move · <b>Shift</b> run · <b>Space</b> jump<br><b>Click</b> dig (hold with drill / jackhammer) · <b>1-7 / Q</b> switch tool<br><b>E</b> use / talk · <b>F</b> vehicles · <b>V</b> vehicle camera<br><b>R</b> stuck? return to shop · <b>M</b> mute · <b>L</b> language',
+  CTL_HTML:'<kbd>WASD</kbd>move <kbd>Mouse</kbd>look <kbd>Click</kbd>dig <kbd>E</kbd>use <kbd>F</kbd>enter/exit vehicle <kbd>Space</kbd>jump <kbd>Shift</kbd>run <kbd>L</kbd>language',
+  FOOT_SHOP:'Press <b>E</b> to close · No refunds. No credit. No exceptions.',
+  FOOT_TERM:'Press <b>E</b> to close'
+};
+let LANG='en';
+try{ const sv=localStorage.getItem('marsLang'); LANG = (sv==='tr'||sv==='en') ? sv : (((navigator.language||'')+'').toLowerCase().indexOf('tr')===0 ? 'tr' : 'en'); }catch(e){ LANG='en'; }
+Object.assign(TR, {"Ask who the old guy in the middle of Mars is": "Mars'ın ortasındaki yaşlı amca kim diye sor", "By the way, who is the old guy in the middle of Mars? Helmet, beard, tiny shop. He keeps telling jokes, guys.": "Bu arada, Mars'ın ortasındaki şu yaşlı amca kim? Kasklı, sakallı, minicik bir dükkânı var. Adam durmadan espri yapıyor arkadaşlar.", "Negative, Courier 7. SD-1 is an unmanned vending unit. There is no old guy on Mars. Please stop making friends with hallucinations. ...Unless he gives discounts. Does he give discounts?": "Olumsuz Courier 7. SD-1 personelsiz bir satış otomatıdır. Mars'ta yaşlı amca falan yok. Lütfen halüsinasyonlarla arkadaşlık kurmayı bırak. ...Tabii indirim yapmıyorsa. İndirim yapıyor mu?", "Answer: no, he does not give discounts": "Cevapla: hayır, indirim yapmıyor", "Update on the hallucination: I asked about discounts. He laughed for a full minute and said no.": "Halüsinasyonla ilgili güncelleme: indirimi sordum. Tam bir dakika güldü, sonra hayır dedi.", "Then he is definitely not one of ours. Our vending machines have never laughed at a customer. They just quietly keep the money. Please ask your hallucination for a receipt. For our records.": "O zaman kesinlikle bizden değil. Bizim otomatlarımız hiçbir müşteriye gülmedi. Sadece sessizce parayı yutarlar. Lütfen halüsinasyonundan fiş iste. Kayıtlarımız için.", "Report: asked him for a receipt": "Rapor: fiş istedim", "He says the printer is broken. He also says to tell you that your last check bounced.": "Yazıcı bozukmuş. Bir de size iletmemi istedi: son çekiniz karşılıksız çıkmış.", "We do not write checks to hallucinations. ...Accounting just went very quiet. They want to know how he knows about the check. Do not tell him anything else. Also, ask whether the discount is still off the table.": "Biz halüsinasyonlara çek yazmayız. ...Muhasebe bir anda çok sessizleşti. Çeki nereden bildiğini soruyorlar. Ona başka hiçbir şey söyleme. Bir de sor bakalım, indirim hâlâ mı yok?", "Report: tried to haggle on behalf of Earth": "Rapor: Dünya adına pazarlık ettim", "I asked again about the discount, officially, on behalf of Planet Earth. He says for Earth the price is double.": "İndirimi tekrar sordum; resmen, Dünya gezegeni adına. Dünya'ya fiyat iki katıymış.", "Double?! ...Understood. Diplomatic relations with the hallucination are suspended. Off the record: Dave says to offer him a coupon. We do not have coupons. Dave will draw one.": "İki katı mı?! ...Anlaşıldı. Halüsinasyonla diplomatik ilişkiler askıya alınmıştır. Aramızda kalsın: Dave ona kupon teklif et diyor. Kuponumuz yok. Dave bir tane çizecek.", "Forward one of his jokes to Earth": "Esprilerinden birini Dünya'ya ilet", "He insists I pass this on: \"Why did the astronaut break up with the Moon? Needed more space.\"": "Bunu iletmem için ısrar ediyor: \"Astronot Ay'dan neden ayrılmış? Biraz mesafe lazımmış.\"", "The control room voted. Eleven groans, one laugh. The laugh was Dave. Dave has been moved to a desk without a microphone. Please stop relaying jokes on the emergency channel. ...Send one more.": "Kontrol odası oyladı. On bir \"öff\", bir kahkaha. Kahkaha Dave'dendi. Dave mikrofonsuz bir masaya alındı. Lütfen acil durum kanalından espri iletmeyi bırak. ...Bir tane daha gönder.", "Send one more joke, as requested": "İstek üzerine bir espri daha gönder", "He says: \"I rate this shop five stars. I can see about nine thousand from here.\"": "Diyor ki: \"Bu dükkâna beş yıldız veriyorum. Buradan dokuz bin tanesini görebiliyorum.\"", "Twelve groans. Dave laughed again, from the hallway. We are forwarding these to the Comedy Review Board, which did not exist until this morning. For a vending machine, he has good timing.": "On iki \"öff\". Dave yine güldü, bu sefer koridordan. Bunları Mizah Değerlendirme Kurulu'na iletiyoruz; kurul bu sabaha kadar yoktu. Bir otomata göre zamanlaması iyi.", "Ask if the old man can deliver the pizza instead": "Pizzayı yaşlı amca getirse olur mu diye sor", "Never mind the pizza. The old man says he delivers. He wants to know your address.": "Pizzayı boş verin. Yaşlı amca paket servis yapıyormuş. Adresinizi soruyor.", "DO NOT give the hallucination our address. ...What toppings does he have?": "Halüsinasyona adresimizi SAKIN verme. ...Malzeme olarak neyi varmış?", "Earth wants to know if I give discounts? Tell them: for Earth, the price is double.": "Dünya indirim yapıyor muyum diye mi soruyor? Söyle onlara: Dünya'ya fiyat iki katı.", "A discount! Sure. Today only: everything costs exactly the same as yesterday.": "İndirim! Tabii. Sadece bugüne özel: her şey dünkü fiyatının tıpatıp aynısı.", "I have a loyalty program. You stay loyal, I keep the prices.": "Sadakat programım var. Sen sadık kalırsın, ben fiyatları sabit tutarım.", "Buy ten tools, get the eleventh at full price!": "On alet alana on birincisi tam fiyatına!"});
+function T(s){ if(LANG==='tr'){ const v=TR[s]; if(v!==undefined) return v; if(window.__miss && typeof s==='string') window.__miss[s]=1; } const e=EN[s]; return e!==undefined?e:s; }
+function F(s){ s=T(s); for(let i=1;i<arguments.length;i++) s=s.split('{'+(i-1)+'}').join(arguments[i]); return s; }
+
+/* ============================== Gürültü ============================== */
+function hash(ix, iz){ let n = (Math.imul(ix,374761393) + Math.imul(iz,668265263)) | 0; n = Math.imul(n ^ (n>>>13), 1274126177); n ^= n>>>16; return (n>>>0)/4294967296; }
+function vnoise(x, z){
+  const ix=Math.floor(x), iz=Math.floor(z), fx=x-ix, fz=z-iz;
+  const u=fx*fx*(3-2*fx), v=fz*fz*(3-2*fz);
+  const a=hash(ix,iz), b=hash(ix+1,iz), c=hash(ix,iz+1), d=hash(ix+1,iz+1);
+  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+}
+function fbm(x, z, o){ let s=0,a=0.5,f=1,t=0; for(let i=0;i<o;i++){ s+=a*vnoise(x*f,z*f); t+=a; a*=0.5; f*=2.03; } return s/t; }
+function smooth(a, b, x){ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); }
+function rng(seed){ let a=seed>>>0; return function(){ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+const rand = rng(20261116);
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const fmt = n => Math.floor(n).toLocaleString(LANG==='tr'?'tr-TR':'en-US');
+
+/* ============================== Arazi ============================== */
+function mountainAt(x, z){
+  const raw = Math.hypot(x-MX, z-MZ);
+  if (raw > 84) return 0;
+  const a = fbm(x*0.018+3.1, z*0.018+7.7, 3);
+  const d = raw*(0.82+0.36*a);
+  let m = 48*Math.exp(-d*d/(2*24*24));
+  const d2 = Math.hypot(x-(MX+30), z-(MZ+12)); m += 20*Math.exp(-d2*d2/(2*13*13));
+  const d3 = Math.hypot(x-(MX-32), z-(MZ+2));  m += 16*Math.exp(-d3*d3/(2*12*12));
+  m *= 0.8+0.4*fbm(x*0.05+11, z*0.05+5, 4);
+  m += (fbm(x*0.16, z*0.16, 3)-0.5)*3*Math.min(1, m/8);
+  m *= 1-smooth(64, 84, raw);
+  return m < 0.08 ? 0 : m;
+}
+function groundAt(x, z){
+  let g = (fbm(x*0.03+50, z*0.03+20, 4)-0.5)*1.8 + (fbm(x*0.13, z*0.13+40, 3)-0.5)*0.35;
+  g *= smooth(6, 20, Math.hypot(x-SHOP.x, z-SHOP.z));
+  g *= 0.4+0.6*smooth(4, 16, Math.hypot(x-SPAWN.x, z-SPAWN.z));
+  g *= 0.12+0.88*smooth(5, 13, Math.hypot(x-SHIP.x, z-SHIP.z));
+  g *= smooth(23, 38, Math.hypot(x-COLONY.x, z-COLONY.z));
+  const e = smooth(132, 149, Math.max(Math.abs(x-W.CX), Math.abs(z-W.CZ)));
+  return g*(1-e) - 1.35*e;
+}
+
+const H  = new Float32Array(N*N);   // güncel yükseklik
+const H0 = new Float32Array(N*N);   // ilk yükseklik
+const FL = new Float32Array(N*N);   // kazılabilecek en alt seviye
+const CN = new Float32Array(N*N);   // renk gürültüsü
+(function buildHeights(){
+  let tot = 0;
+  for (let j=0;j<N;j++){
+    const z = W.Z0 + j*W.cell;
+    for (let i=0;i<N;i++){
+      const x = W.X0 + i*W.cell, idx = j*N+i;
+      const g = groundAt(x,z), m = mountainAt(x,z);
+      H0[idx] = H[idx] = g+m;
+      FL[idx] = m > 0 ? Math.min(g+m, BASE_Y) : g+m;   // dağ, dükkânın zemin seviyesine kadar kazılır; altı kazılamaz
+      CN[idx] = fbm(x*0.09+70, z*0.09+13, 3);
+      tot += H0[idx]-FL[idx];
+    }
+  }
+  S.totalVol = tot*W.cell*W.cell;
+})();
+
+function hAt(x, z){
+  let fx=(x-W.X0)/W.cell, fz=(z-W.Z0)/W.cell;
+  if (fx<0) fx=0; else if (fx>N-1.001) fx=N-1.001;
+  if (fz<0) fz=0; else if (fz>N-1.001) fz=N-1.001;
+  const i=Math.floor(fx), j=Math.floor(fz), u=fx-i, v=fz-j, k=j*N+i;
+  const a=H[k], b=H[k+1], c=H[k+N], d=H[k+N+1];
+  return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v;
+}
+
+/* ============================== Sahne ============================== */
+const canvas = $('c');
+const renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.autoClear = false;
+
+const HORIZON = new THREE.Color(0xdca472);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(HORIZON.getHex(), 260, 1900);
+const camera = new THREE.PerspectiveCamera(72, 1, 0.1, 3200);
+camera.rotation.order = 'YXZ';
+scene.add(camera);
+
+const SUN_LIGHT = new THREE.Vector3(1, 0.42, 0.12).normalize();   // ışığın geldiği yön
+const SUN_VIS   = new THREE.Vector3(1, 0.17, 0.05).normalize();   // gökyüzünde göründüğü yer (ufka yakın)
+
+const hemi = new THREE.HemisphereLight(0xffe2c4, 0xb0603a, 0.62);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff0de, 0.92);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left=-85; sun.shadow.camera.right=85; sun.shadow.camera.top=85; sun.shadow.camera.bottom=-85;
+sun.shadow.camera.near=1; sun.shadow.camera.far=800;
+sun.shadow.bias=-0.0006; sun.shadow.normalBias=0.5;
+scene.add(sun); scene.add(sun.target);
+
+function soilTextures(){
+  const SZ=512;
+  function hp(ix,iz,p){ return hash(((ix%p)+p)%p + p*977, ((iz%p)+p)%p + p*131); }
+  function vn(x,z,p){ const ix=Math.floor(x), iz=Math.floor(z), fx=x-ix, fz=z-iz, u=fx*fx*(3-2*fx), v=fz*fz*(3-2*fz);
+    const a=hp(ix,iz,p), b=hp(ix+1,iz,p), c=hp(ix,iz+1,p), d=hp(ix+1,iz+1,p); return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; }
+  const hg=new Float32Array(SZ*SZ), tone=new Float32Array(SZ*SZ), peb=new Float32Array(SZ*SZ);
+  for(let y=0;y<SZ;y++) for(let x=0;x<SZ;x++){
+    let s=0,a=0.5,t=0; for(let f=8;f<=256;f*=2){ s+=a*vn(x/SZ*f,y/SZ*f,f); t+=a; a*=0.58; }
+    hg[y*SZ+x]=s/t; tone[y*SZ+x]=vn(x/SZ*4+0.5,y/SZ*4+0.5,4)*0.6+vn(x/SZ*16,y/SZ*16,16)*0.4;
+  }
+  const pr=rng(777);
+  for(let n=0;n<520;n++){
+    const cx=pr()*SZ, cy=pr()*SZ, r=pr()<0.12?6+pr()*8:1.5+pr()*4.5, R=Math.ceil(r);
+    for(let yy=-R;yy<=R;yy++) for(let xx=-R;xx<=R;xx++){ const d=Math.hypot(xx,yy)/r; if(d>=1) continue;
+      const k=(((Math.floor(cy)+yy)%SZ)+SZ)%SZ*SZ + (((Math.floor(cx)+xx)%SZ)+SZ)%SZ;
+      hg[k]+=Math.sqrt(1-d*d)*r*0.011; peb[k]=Math.max(peb[k],Math.min(1,(1-d)*3)); }
+  }
+  const cc=document.createElement('canvas'); cc.width=cc.height=SZ; const cg=cc.getContext('2d'); const ci=cg.createImageData(SZ,SZ);
+  const nc=document.createElement('canvas'); nc.width=nc.height=SZ; const ng=nc.getContext('2d'); const ni=ng.createImageData(SZ,SZ);
+  for(let y=0;y<SZ;y++) for(let x=0;x<SZ;x++){
+    const k=y*SZ+x, xl=y*SZ+((x+SZ-1)%SZ), xr=y*SZ+((x+1)%SZ), yu=((y+SZ-1)%SZ)*SZ+x, yd=((y+1)%SZ)*SZ+x;
+    const dx=(hg[xr]-hg[xl])*16, dy=(hg[yd]-hg[yu])*16, il=1/Math.sqrt(dx*dx+dy*dy+1);
+    ni.data[k*4]=(-dx*il*0.5+0.5)*255; ni.data[k*4+1]=(-dy*il*0.5+0.5)*255; ni.data[k*4+2]=(il*0.5+0.5)*255; ni.data[k*4+3]=255;
+    let v=0.66+0.42*hg[k]+(Math.random()-0.5)*0.09; const tn=tone[k];
+    let r=v*(0.96+0.08*tn), g=v*(0.90+0.10*tn), b=v*(0.82+0.14*tn);
+    const pb=peb[k]*0.55; r=r*(1-pb)+0.80*pb; g=g*(1-pb)+0.74*pb; b=b*(1-pb)+0.70*pb;
+    if(Math.random()<0.006){ r*=0.6; g*=0.6; b*=0.6; }
+    ci.data[k*4]=Math.max(0,Math.min(255,r*255)); ci.data[k*4+1]=Math.max(0,Math.min(255,g*255)); ci.data[k*4+2]=Math.max(0,Math.min(255,b*255)); ci.data[k*4+3]=255;
+  }
+  cg.putImageData(ci,0,0); ng.putImageData(ni,0,0);
+  const an=Math.min(8, renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1);
+  function tex(c,rp){ const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=an; t.repeat.set(rp,rp); return t; }
+  return { map:tex(cc,50), normal:tex(nc,50), farMap:tex(cc,1000), hillMap:tex(cc,16), hillNormal:tex(nc,16) };
+}
+const soil = soilTextures();
+
+/* --- arazi ağı --- */
+const posArr = new Float32Array(N*N*3), norArr = new Float32Array(N*N*3), colArr = new Float32Array(N*N*3), uvArr = new Float32Array(N*N*2);
+const idxArr = new Uint32Array((N-1)*(N-1)*6);
+(function(){
+  let p=0, q=0;
+  for(let j=0;j<N;j++) for(let i=0;i<N;i++){ posArr[p*3]=W.X0+i*W.cell; posArr[p*3+1]=H[p]; posArr[p*3+2]=W.Z0+j*W.cell; uvArr[p*2]=i/(N-1); uvArr[p*2+1]=j/(N-1); p++; }
+  for(let j=0;j<N-1;j++) for(let i=0;i<N-1;i++){ const a=j*N+i, b=a+1, c=a+N, d=c+1; idxArr[q++]=a; idxArr[q++]=c; idxArr[q++]=b; idxArr[q++]=b; idxArr[q++]=c; idxArr[q++]=d; }
+})();
+function shadeVertex(i, j){
+  const k=j*N+i, h=H[k];
+  posArr[k*3+1]=h;
+  const hl=H[k-(i>0?1:0)], hr=H[k+(i<N-1?1:0)], hd=H[k-(j>0?N:0)], hu=H[k+(j<N-1?N:0)];
+  let nx=hl-hr, ny=2*W.cell, nz=hd-hu; const il=1/Math.sqrt(nx*nx+ny*ny+nz*nz);
+  norArr[k*3]=nx*il; norArr[k*3+1]=ny*il; norArr[k*3+2]=nz*il;
+  const n=CN[k]; let r=0.90+0.12*n, g=0.47+0.12*n, b=0.26+0.06*n;
+  const t=Math.min(1,Math.max(0,h/42)); r*=1-0.10*t; g*=1-0.20*t; b*=1-0.12*t;
+  const s=0.94+0.06*Math.sin(h*1.7+n*4); r*=s; g*=s; b*=s;
+  const dug=H0[k]-h;
+  if(dug>0.01){ const kk=Math.min(1,dug/1.6); r*=1-0.20*kk; g*=1-0.34*kk; b*=1-0.30*kk; }
+  colArr[k*3]=r; colArr[k*3+1]=g; colArr[k*3+2]=b;
+}
+for(let j=0;j<N;j++) for(let i=0;i<N;i++) shadeVertex(i,j);
+const tgeo = new THREE.BufferGeometry();
+const aPos = new THREE.BufferAttribute(posArr,3), aNor = new THREE.BufferAttribute(norArr,3), aCol = new THREE.BufferAttribute(colArr,3);
+aPos.setUsage(THREE.DynamicDrawUsage); aNor.setUsage(THREE.DynamicDrawUsage); aCol.setUsage(THREE.DynamicDrawUsage);
+tgeo.setAttribute('position',aPos); tgeo.setAttribute('normal',aNor); tgeo.setAttribute('color',aCol);
+tgeo.setAttribute('uv', new THREE.BufferAttribute(uvArr,2));
+tgeo.setIndex(new THREE.BufferAttribute(idxArr,1));
+const terrain = new THREE.Mesh(tgeo, new THREE.MeshStandardMaterial({ vertexColors:true, map:soil.map, normalMap:soil.normal, roughness:1, metalness:0 }));
+terrain.frustumCulled=false; terrain.castShadow=true; terrain.receiveShadow=true;
+scene.add(terrain);
+
+function updateRegion(i0,i1,j0,j1){
+  i0=Math.max(0,i0); j0=Math.max(0,j0); i1=Math.min(N-1,i1); j1=Math.min(N-1,j1);
+  for(let j=j0;j<=j1;j++) for(let i=i0;i<=i1;i++) shadeVertex(i,j);
+  const off=j0*N*3, cnt=(j1-j0+1)*N*3;
+  aPos.updateRange.offset=off; aPos.updateRange.count=cnt; aPos.needsUpdate=true;
+  aNor.updateRange.offset=off; aNor.updateRange.count=cnt; aNor.needsUpdate=true;
+  aCol.updateRange.offset=off; aCol.updateRange.count=cnt; aCol.needsUpdate=true;
+}
+const tmpI=[], tmpA=[], tmpW=[];
+// İleriye doğru kazı: vuruş başına sabit miktarda toprak, oyuncuya en yakın sütunlardan alınır.
+// Hiçbir nokta zemin seviyesinin (FL) ya da oyuncunun ayak seviyesinin altına inmez.
+function digAt(x, z, r, budgetKg, ox, oz, feet, r0, r1){
+  const c=W.cell;
+  const i0=Math.max(1,Math.ceil((x-r-W.X0)/c)), i1=Math.min(N-2,Math.floor((x+r-W.X0)/c));
+  const j0=Math.max(1,Math.ceil((z-r-W.Z0)/c)), j1=Math.min(N-2,Math.floor((z+r-W.Z0)/c));
+  tmpI.length=0; tmpA.length=0; tmpW.length=0; let minD=1e9;
+  for(let j=j0;j<=j1;j++){ const vz=W.Z0+j*c, dz=vz-z;
+    for(let i=i0;i<=i1;i++){ const vx=W.X0+i*c, dx=vx-x; const d2=(dx*dx+dz*dz)/(r*r); if(d2>=1) continue;
+      const k=j*N+i, dp=Math.hypot(vx-ox,vz-oz);
+      const av=H[k]-FL[k]; if(av<=0.002) continue;
+      tmpI.push(k); tmpA.push(av); tmpW.push(dp); if(dp<minD) minD=dp; tmpW.push(1-d2*d2); } }
+  const n=tmpI.length; if(!n) return 0;
+  let need=budgetKg/DENS/(c*c), removed=0;
+  for(let pass=0; pass<4 && need>1e-4; pass++){
+    let sw=0; for(let q=0;q<n;q++) if(tmpA[q]>0) sw+=tmpW[q*2+1]*Math.exp(-(tmpW[q*2]-minD)/0.9)+0.01;
+    if(sw<=0) break; let got=0;
+    for(let q=0;q<n;q++){ if(tmpA[q]<=0) continue;
+      const w=tmpW[q*2+1]*Math.exp(-(tmpW[q*2]-minD)/0.9)+0.01; const take=Math.min(tmpA[q], need*w/sw);
+      H[tmpI[q]]-=take; tmpA[q]-=take; got+=take; }
+    need-=got; removed+=got; if(got<1e-5) break;
+  }
+  const kg=removed*c*c*DENS; if(kg<=0.0001) return 0;
+  S.removedVol += kg/DENS;
+  updateRegion(i0-1,i1+1,j0-1,j1+1);
+  return kg;
+}
+function rayTerrain(ox,oy,oz,dx,dy,dz,maxD){
+  let t=0, prev=0;
+  while(t<=maxD){
+    if(oy+dy*t < hAt(ox+dx*t, oz+dz*t)){
+      let a=prev, b=t;
+      for(let k=0;k<7;k++){ const m=(a+b)/2; if(oy+dy*m < hAt(ox+dx*m, oz+dz*m)) b=m; else a=m; }
+      return { x:ox+dx*b, y:oy+dy*b, z:oz+dz*b };
+    }
+    prev=t; t+=0.25;
+  }
+  return null;
+}
+
+/* --- uzak zemin --- */
+const far = new THREE.Mesh(new THREE.CircleGeometry(3000, 64), new THREE.MeshLambertMaterial({ color:new THREE.Color(0.93,0.50,0.28), map:soil.farMap }));
+far.rotation.x=-Math.PI/2; far.position.set(W.CX,-1.2,W.CZ); scene.add(far);
+
+/* --- uzak dağlar ve tepeler --- */
+function makeHill(w, h, seed, tint){
+  const seg=44, g=new THREE.PlaneGeometry(1,1,seg,seg); g.rotateX(-Math.PI/2);
+  const p=g.attributes.position, col=new Float32Array(p.count*3);
+  for(let i=0;i<p.count;i++){ const x=p.getX(i), z=p.getZ(i);
+    const a=fbm(x*3+seed, z*3+seed*0.7, 3), d=Math.hypot(x,z)*2*(0.8+0.4*a);
+    let y=Math.exp(-d*d*3.2)*(0.7+0.5*fbm(x*6+seed*1.3, z*6+seed, 4));
+    y+=0.35*Math.exp(-((x-0.16)*(x-0.16)+(z+0.1)*(z+0.1))*40)+0.28*Math.exp(-((x+0.18)*(x+0.18)+(z-0.05)*(z-0.05))*46);
+    y+=(fbm(x*18+seed, z*18, 3)-0.5)*0.07*Math.min(1,y*5);
+    y*=1-smooth(0.38,0.5,Math.hypot(x,z)); y=Math.max(0,y);
+    p.setY(i,y);
+    const n=fbm(x*30+seed, z*30+7, 3), t=Math.min(1,y); const s=0.94+0.06*Math.sin(y*h*0.9+n*4);
+    col[i*3]=(0.90+0.12*n)*(1-0.10*t)*s*tint; col[i*3+1]=(0.47+0.12*n)*(1-0.20*t)*s*tint; col[i*3+2]=(0.26+0.06*n)*(1-0.12*t)*s*tint; }
+  g.setAttribute('color', new THREE.BufferAttribute(col,3));
+  g.computeVertexNormals();
+  const m=new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors:true, map:soil.hillMap, normalMap:soil.hillNormal, roughness:1, metalness:0 }));
+  m.scale.set(w,h,w); return m;
+}
+(function(){
+  function landingLane(ang){ return Math.abs(Math.atan2(Math.sin(ang-Math.PI/2),Math.cos(ang-Math.PI/2)))<0.6; }   // iniş rotası boş kalsın
+  const n=17;
+  for(let i=0;i<n;i++){
+    const ang=(i+rand()*0.6)/n*Math.PI*2, w=300+rand()*400, h=75+rand()*170; let dist=175+w/2+rand()*520;
+    if(landingLane(ang)) dist=Math.max(dist,760+w/2);
+    const m=makeHill(w,h,i*13.7+1,0.9+rand()*0.14); m.position.set(W.CX+Math.cos(ang)*dist,-1.3,W.CZ+Math.sin(ang)*dist); m.rotation.y=rand()*6.28; scene.add(m);
+  }
+  for(let i=0;i<9;i++){
+    const ang=(i+rand()*0.8)/9*Math.PI*2, w=120+rand()*120, h=18+rand()*32; let dist=215+w/2+rand()*90;
+    if(landingLane(ang)) dist=Math.max(dist,640+w/2);
+    const m=makeHill(w,h,i*7.3+90,0.95+rand()*0.1); m.position.set(W.CX+Math.cos(ang)*dist,-1.3,W.CZ+Math.sin(ang)*dist); m.rotation.y=rand()*6.28; scene.add(m);
+  }
+})();
+
+/* --- kayalar --- */
+(function(){
+  const cnt=1100, g=new THREE.DodecahedronGeometry(1,0), mat=new THREE.MeshLambertMaterial({ color:0x9a5234, flatShading:true });
+  const im=new THREE.InstancedMesh(g,mat,cnt), o=new THREE.Object3D(); let n=0, guard=0;
+  while(n<cnt && guard++<12000){
+    const a=rand()*6.283, rr=Math.sqrt(rand())*138, x=W.CX+Math.cos(a)*rr, z=W.CZ+Math.sin(a)*rr;
+    if(mountainAt(x,z)>0.1) continue;
+    if(Math.hypot(x-SHOP.x,z-SHOP.z)<11 || Math.hypot(x-SPAWN.x,z-SPAWN.z)<4 || Math.hypot(x-SHIP.x,z-SHIP.z)<8 || Math.hypot(x-COLONY.x,z-COLONY.z)<24) continue;
+    const s=rand()<0.05 ? 0.9+rand()*1.3 : (rand()<0.35 ? 0.15+rand()*0.45 : 0.04+rand()*0.12);
+    o.position.set(x, hAt(x,z)-0.25*s, z); o.rotation.set(rand()*6,rand()*6,rand()*6); o.scale.set(s*(0.8+rand()*0.5), s*(0.55+rand()*0.4), s*(0.8+rand()*0.5)); o.updateMatrix();
+    im.setMatrixAt(n++, o.matrix);
+  }
+  im.count=n; im.instanceMatrix.needsUpdate=true; im.castShadow=true; im.receiveShadow=true; im.frustumCulled=false; scene.add(im);
+})();
+
+/* --- gökyüzü --- */
+const sky = new THREE.Group(); scene.add(sky);
+(function(){
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(2900,32,20), new THREE.ShaderMaterial({
+    side:THREE.BackSide, depthWrite:false, fog:false,
+    uniforms:{ sunDir:{value:SUN_VIS}, cH:{value:HORIZON}, cM:{value:new THREE.Color(0x8f5d57)}, cZ:{value:new THREE.Color(0x2d2f52)} },
+    vertexShader:'varying vec3 vD; void main(){ vD=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader:'varying vec3 vD; uniform vec3 sunDir,cH,cM,cZ; void main(){ vec3 d=normalize(vD); float h=d.y; vec3 c=mix(cH,cM,smoothstep(0.0,0.30,h)); c=mix(c,cZ,smoothstep(0.18,0.80,h)); float s=max(dot(d,sunDir),0.0); c+=vec3(1.0,0.72,0.45)*(pow(s,10.0)*0.22+pow(s,90.0)*0.35); gl_FragColor=vec4(c,1.0); }'
+  }));
+  dome.renderOrder=-10; dome.frustumCulled=false; sky.add(dome);
+
+  // yıldızlar (çok parlak değil, ufka doğru sönüyor)
+  const sc=900, sp=new Float32Array(sc*3), scol=new Float32Array(sc*3);
+  for(let i=0;i<sc;i++){ let x,y,z,l; do{ x=rand()*2-1; y=rand(); z=rand()*2-1; l=Math.hypot(x,y,z); }while(l>1||l<0.1||y/l<0.10);
+    x/=l; y/=l; z/=l; sp[i*3]=x*2700; sp[i*3+1]=y*2700; sp[i*3+2]=z*2700;
+    const b=(0.25+rand()*0.6)*smooth(0.10,0.55,y); scol[i*3]=b; scol[i*3+1]=b*(0.92+rand()*0.08); scol[i*3+2]=b*(0.85+rand()*0.15); }
+  const sg=new THREE.BufferGeometry(); sg.setAttribute('position',new THREE.BufferAttribute(sp,3)); sg.setAttribute('color',new THREE.BufferAttribute(scol,3));
+  const stars=new THREE.Points(sg,new THREE.PointsMaterial({ size:2.2, sizeAttenuation:false, vertexColors:true, transparent:true, opacity:0.85, blending:THREE.AdditiveBlending, depthWrite:false, fog:false }));
+  stars.frustumCulled=false; sky.add(stars);
+
+  // güneş
+  const c=document.createElement('canvas'); c.width=c.height=256; const g=c.getContext('2d');
+  const gr=g.createRadialGradient(128,128,0,128,128,128);
+  gr.addColorStop(0,'rgba(255,255,245,1)'); gr.addColorStop(0.10,'rgba(255,248,225,1)'); gr.addColorStop(0.16,'rgba(255,220,160,0.55)'); gr.addColorStop(0.45,'rgba(255,170,90,0.14)'); gr.addColorStop(1,'rgba(255,150,70,0)');
+  g.fillStyle=gr; g.fillRect(0,0,256,256);
+  const sm=new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false });
+  sm.fog=false;
+  const spr=new THREE.Sprite(sm); spr.position.copy(SUN_VIS).multiplyScalar(2600); spr.scale.set(900,900,1); sky.add(spr);
+
+  // dünya (çok detaylı değil)
+  const e=document.createElement('canvas'); e.width=256; e.height=128; const eg=e.getContext('2d');
+  eg.fillStyle='#2c6fd0'; eg.fillRect(0,0,256,128);
+  eg.fillStyle='#4a9a55';
+  for(let i=0;i<9;i++){ eg.beginPath(); eg.ellipse(rand()*256, 22+rand()*84, 12+rand()*24, 8+rand()*16, rand()*3, 0, 6.3); eg.fill(); }
+  eg.fillStyle='rgba(255,255,255,0.75)';
+  for(let i=0;i<12;i++){ eg.beginPath(); eg.ellipse(rand()*256, rand()*128, 14+rand()*26, 2+rand()*4, (rand()-0.5)*0.5, 0, 6.3); eg.fill(); }
+  eg.fillStyle='rgba(255,255,255,0.9)'; eg.fillRect(0,0,256,7); eg.fillRect(0,121,256,7);
+  const em=new THREE.MeshLambertMaterial({ map:new THREE.CanvasTexture(e), emissive:0x16304f }); em.fog=false;
+  const earth=new THREE.Mesh(new THREE.SphereGeometry(78,24,16), em);
+  earth.position.copy(new THREE.Vector3(-0.48,0.60,-0.80).normalize()).multiplyScalar(2500); earth.rotation.set(0.3,1.2,0.25); sky.add(earth);
+  sky.userData.earth=earth;
+})();
+
+/* ============================== Dükkân ve amca ============================== */
+function mesh(geo, color, o){ const m=new THREE.Mesh(geo, new THREE.MeshLambertMaterial(Object.assign({ color:color }, o||{}))); m.castShadow=true; m.receiveShadow=true; return m; }
+function put(parent, m, x, y, z){ m.position.set(x,y,z); parent.add(m); return m; }
+function textTexture(w, h, draw){ const c=document.createElement('canvas'); c.width=w; c.height=h; draw(c.getContext('2d'),w,h); return new THREE.CanvasTexture(c); }
+
+const anims = [];
+function neon(geo, color, o){ return new THREE.Mesh(geo, new THREE.MeshBasicMaterial(Object.assign({ color:color }, o||{}))); }
+function holoMat(w, h, draw){ return new THREE.MeshBasicMaterial({ map:textTexture(w,h,draw), transparent:true, side:THREE.DoubleSide, depthWrite:false }); }
+function glowText(g, txt, x, y, font, color){ g.font=font; g.textAlign='center'; g.textBaseline='middle'; g.shadowColor=color; g.shadowBlur=18; g.fillStyle=color; g.fillText(txt,x,y); g.shadowBlur=6; g.fillStyle='#ffffff'; g.globalAlpha=0.55; g.fillText(txt,x,y); g.globalAlpha=1; }
+function solarTexture(){ return textTexture(256,128,function(g,w,h){ g.fillStyle='#16305a'; g.fillRect(0,0,w,h); g.strokeStyle='#5f8fd0'; g.lineWidth=2; for(let x=0;x<=w;x+=32){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,h); g.stroke(); } for(let y=0;y<=h;y+=32){ g.beginPath(); g.moveTo(0,y); g.lineTo(w,y); g.stroke(); } }); }
+function beacon(x, z, color){ const m=neon(new THREE.CylinderGeometry(0.45,0.45,90,10,1,true), color, { transparent:true, opacity:0.16, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }); m.material.fog=false; m.position.set(x,45,z); scene.add(m); return m; }
+const shop = new THREE.Group();
+const amca = { root:new THREE.Group(), head:new THREE.Group(), armL:null, armR:null };
+(function(){
+  const gy = hAt(SHOP.x, SHOP.z);
+  shop.position.set(SHOP.x, gy, SHOP.z);
+  shop.rotation.y = Math.atan2(2-SHOP.x, -2-SHOP.z);
+  const MET=0x48505c, DARK=0x1f242b, PAN=0x66707d;
+  put(shop, mesh(new THREE.CylinderGeometry(4.3,4.6,0.5,8), DARK), 0,0,0).rotation.y=Math.PI/8;      // platform
+  put(shop, neon(new THREE.TorusGeometry(4.5,0.05,6,48), 0xff8a2a), 0,0.24,0).rotation.x=Math.PI/2;
+  put(shop, mesh(new THREE.BoxGeometry(4.6,1.0,0.8), MET), 0,0.75,1.5);                               // tezgâh
+  put(shop, mesh(new THREE.BoxGeometry(4.9,0.1,1.05), 0x12161c), 0,1.3,1.5);
+  put(shop, neon(new THREE.BoxGeometry(4.4,0.06,0.02), 0x4fd8ff), 0,1.02,1.91);
+  put(shop, neon(new THREE.BoxGeometry(4.4,0.04,0.02), 0xff8a2a), 0,0.5,1.91);
+  put(shop, mesh(new THREE.BoxGeometry(6.0,2.8,0.14), PAN), 0,1.65,-2.15);                            // arka panel
+  for(let i=-1;i<=1;i++) put(shop, mesh(new THREE.BoxGeometry(1.7,1.0,0.06), DARK), i*1.95,0.95,-2.06);
+  const rate=new THREE.Mesh(new THREE.PlaneGeometry(3.2,0.9), holoMat(512,144,function(g,w,h){ g.fillStyle='rgba(6,24,36,0.85)'; g.fillRect(0,0,w,h); glowText(g,'DIRT WANTED',w/2,46,'900 40px Orbitron, Arial','#7fe3ff'); glowText(g,'TODAY: 1 CREDIT / KG',w/2,104,'700 26px Orbitron, Arial','#ffb35a'); }));
+  rate.position.set(0,2.35,-2.06); shop.add(rate);
+  [-3.0,3.0].forEach(function(x){ put(shop, mesh(new THREE.BoxGeometry(0.24,3.5,0.34), MET), x,1.95,-1.9); put(shop, mesh(new THREE.CylinderGeometry(0.07,0.07,3.3,8), 0xc8ced6), x,1.85,2.0); put(shop, neon(new THREE.BoxGeometry(0.05,2.6,0.05), 0x4fd8ff), x,1.9,-1.7); });
+  const roof=new THREE.Group(); roof.position.set(0,3.72,0.1); roof.rotation.x=0.08; shop.add(roof);
+  put(roof, mesh(new THREE.BoxGeometry(7.2,0.16,5.6), DARK), 0,0,0);
+  put(roof, mesh(new THREE.BoxGeometry(6.8,0.03,5.2), 0xffffff, { map:solarTexture() }), 0,0.1,0);
+  put(roof, neon(new THREE.BoxGeometry(7.0,0.05,0.05), 0x4fd8ff), 0,-0.1,2.78);
+  put(roof, neon(new THREE.BoxGeometry(0.05,0.05,5.4), 0xff8a2a), -3.58,-0.1,0); put(roof, neon(new THREE.BoxGeometry(0.05,0.05,5.4), 0xff8a2a), 3.58,-0.1,0);
+  const sg=new THREE.Mesh(new THREE.PlaneGeometry(5.6,1.5), holoMat(768,208,function(g,w,h){ glowText(g,'SPACE DUST',w/2,78,'900 92px Orbitron, Arial','#ffb35a'); glowText(g,'BUY  /  SELL  /  DIG',w/2,166,'700 34px Orbitron, Arial','#7fe3ff'); }));
+  sg.position.set(0,5.0,0.6); shop.add(sg);
+  anims.push(function(t){ sg.position.y=5.0+Math.sin(t*1.4)*0.08; sg.material.opacity=0.86+Math.sin(t*9)*0.05; });
+  put(shop, mesh(new THREE.CylinderGeometry(0.05,0.05,0.9,6), MET), 0,4.2,0.6);
+  put(shop, mesh(new THREE.CylinderGeometry(0.04,0.05,2.8,6), 0xc8ced6), -3.1,5.1,-2.2);                // anten
+  const blink=put(shop, neon(new THREE.SphereGeometry(0.09,8,6), 0xff3b2e), -3.1,6.55,-2.2);
+  anims.push(function(t){ blink.visible=(t%1.2)<0.6; });
+  const dish=put(shop, mesh(new THREE.SphereGeometry(0.55,14,8,0,Math.PI*2,0,1.0), 0xdfe3e8, { side:THREE.DoubleSide }), 3.0,4.3,-2.0); dish.rotation.set(-2.2,0,0.4);
+  [[-2.4,3.1,0.3],[2.5,3.0,-0.4],[-3.2,2.0,0.9]].forEach(function(c){ const b=put(shop, mesh(new THREE.BoxGeometry(0.9,0.9,0.9), 0x55606c), c[0],0.7,c[1]); b.rotation.y=c[2]; const st=put(shop, neon(new THREE.BoxGeometry(0.92,0.08,0.92), 0xff8a2a), c[0],0.95,c[1]); st.rotation.y=c[2]; });
+  put(shop, mesh(new THREE.BoxGeometry(0.5,0.06,0.36), 0x12161c), 1.6,1.38,1.5);                        // holo terminal
+  put(shop, neon(new THREE.PlaneGeometry(0.46,0.3), 0x7fe08a, { transparent:true, opacity:0.8, side:THREE.DoubleSide }), 1.6,1.6,1.42).rotation.x=-0.4;
+  put(shop, mesh(new THREE.BoxGeometry(5.2,0.08,0.5), DARK), 0,1.75,-1.85);                              // raf
+  put(shop, mesh(new THREE.CylinderGeometry(0.16,0.16,0.5,10), 0x4a8ad0), -1.9,2.05,-1.85);
+  put(shop, neon(new THREE.BoxGeometry(0.4,0.4,0.3), 0xffd27a), 2.0,2.0,-1.85);
+
+  // amca
+  const a = amca.root; a.position.set(0,0.25,0.35); shop.add(a);
+  put(a, mesh(new THREE.CylinderGeometry(0.34,0.46,1.15,12), 0x7b5534), 0,0.58,0);              // hırka
+  put(a, mesh(new THREE.BoxGeometry(0.5,0.6,0.26), 0xf0f0f0), 0,0.8,-0.36);                     // oksijen tüpü çantası
+  put(a, mesh(new THREE.TorusGeometry(0.36,0.075,8,20), 0xf2f2f2), 0,1.2,0).rotation.x=Math.PI/2; // kask yakası
+  amca.armL = put(a, mesh(new THREE.CylinderGeometry(0.085,0.075,0.75,8), 0x7b5534), -0.42,0.98,0.34);
+  amca.armR = put(a, mesh(new THREE.CylinderGeometry(0.085,0.075,0.75,8), 0x7b5534),  0.42,0.98,0.34);
+  amca.armL.rotation.set(1.15,0,0.25); amca.armR.rotation.set(1.15,0,-0.25);
+  put(a, mesh(new THREE.SphereGeometry(0.1,8,6), 0xf2f2f2), -0.52,0.84,0.66);
+  put(a, mesh(new THREE.SphereGeometry(0.1,8,6), 0xf2f2f2),  0.52,0.84,0.66);
+  const hd = amca.head; hd.position.set(0,1.52,0); a.add(hd);
+  put(hd, mesh(new THREE.SphereGeometry(0.27,16,12), 0xe2b48e), 0,0,0);
+  const beard = put(hd, mesh(new THREE.SphereGeometry(0.22,12,10), 0xffffff), 0,-0.17,0.12); beard.scale.set(1.05,1.15,0.75);
+  put(hd, mesh(new THREE.SphereGeometry(0.075,8,6), 0xf6f6f6), -0.08,-0.06,0.25).scale.set(1.5,0.7,0.8);
+  put(hd, mesh(new THREE.SphereGeometry(0.075,8,6), 0xf6f6f6),  0.08,-0.06,0.25).scale.set(1.5,0.7,0.8);
+  put(hd, mesh(new THREE.SphereGeometry(0.05,8,6), 0xd19a76), 0,0.0,0.27);
+  put(hd, mesh(new THREE.SphereGeometry(0.03,8,6), 0x22140c), -0.1,0.07,0.245);
+  put(hd, mesh(new THREE.SphereGeometry(0.03,8,6), 0x22140c),  0.1,0.07,0.245);
+  put(hd, mesh(new THREE.BoxGeometry(0.11,0.03,0.03), 0xffffff), -0.1,0.14,0.245).rotation.z=-0.2;
+  put(hd, mesh(new THREE.BoxGeometry(0.11,0.03,0.03), 0xffffff),  0.1,0.14,0.245).rotation.z=0.2;
+  const glass = new THREE.Mesh(new THREE.SphereGeometry(0.43,20,14), new THREE.MeshPhongMaterial({ color:0xbfe8ff, transparent:true, opacity:0.24, shininess:120, specular:0xffffff, depthWrite:false }));
+  hd.add(glass);
+  put(hd, mesh(new THREE.CylinderGeometry(0.012,0.012,0.4,6), 0xdddddd), 0.3,0.48,-0.05).rotation.z=-0.35;
+  put(hd, mesh(new THREE.SphereGeometry(0.045,8,6), 0xff5a4a, { emissive:0x801a10 }), 0.37,0.67,-0.05);
+  scene.add(shop); shop.updateMatrixWorld(true);
+})();
+
+/* ============================== Kazı makinesi ============================== */
+const VEHS = VDEFS.map(function(d){ return { def:d, root:new THREE.Group(), arm:new THREE.Group(), stick:null, bucket:null, spin:null, owned:false, x:0, z:0, yaw:0, speed:0, pitch:0, roll:0, dig:0, swingT:-1, hitDone:false }; });
+const borer = VEHS[0], excav = VEHS[1];
+const vehTex = {
+  tread: (function(){ const t=textTexture(64,64,function(g){ g.fillStyle='#17181b'; g.fillRect(0,0,64,64); g.fillStyle='#3a3d43'; for(let y=0;y<64;y+=16) g.fillRect(0,y,64,8); }); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(1,9); return t; })(),
+  hazard: (function(){ const t=textTexture(128,32,function(g){ g.fillStyle='#f0b41e'; g.fillRect(0,0,128,32); g.fillStyle='#17181b'; for(let x=-32;x<160;x+=32){ g.beginPath(); g.moveTo(x,32); g.lineTo(x+16,32); g.lineTo(x+32,0); g.lineTo(x+16,0); g.fill(); } }); t.wrapS=THREE.RepeatWrapping; t.repeat.set(3,1); return t; })(),
+  grille: (function(){ const t=textTexture(64,64,function(g){ g.fillStyle='#1b1c1f'; g.fillRect(0,0,64,64); g.fillStyle='#3e4148'; for(let y=4;y<64;y+=10) g.fillRect(4,y,56,4); }); return t; })()
+};
+function vBox(w,h,d){ return new THREE.BoxGeometry(w,h,d); }
+function vCyl(a,b,h,n){ return new THREE.CylinderGeometry(a,b,h,n||12); }
+function vGlass(geo){ return new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color:0x9fd6ff, transparent:true, opacity:0.22, shininess:140, specular:0xffffff, depthWrite:false, side:THREE.DoubleSide })); }
+function trackUnit(parent, x, len, h, w){
+  const g=new THREE.Group(); g.position.set(x,0,0); parent.add(g);
+  put(g, mesh(vBox(w,h,len), 0xffffff, { map:vehTex.tread }), 0,h/2+0.03,0);
+  [-len/2,len/2].forEach(function(z){ put(g, mesh(vCyl(h/2,h/2,w,16), 0x202124), 0,h/2+0.03,z).rotation.z=Math.PI/2; put(g, mesh(vCyl(h*0.22,h*0.22,w+0.1,10), 0x8b929c), 0,h/2+0.03,z).rotation.z=Math.PI/2; });
+  const n=Math.max(3,Math.round(len/0.9));
+  for(let i=0;i<n;i++) put(g, mesh(vCyl(h*0.3,h*0.3,w+0.08,10), 0x5a5f68), 0,h*0.36,-len/2+0.5+i*(len-1.0)/(n-1)).rotation.z=Math.PI/2;
+  put(g, mesh(vBox(w+0.12,0.07,len*0.86), 0x2a2c30), 0,h+0.09,0);
+}
+(function(){   // EKSKAVATÖR
+  const r=excav.root, Y=0xf0b41e, YD=0xc98f10, D=0x232528, G=0x4a4f58, SIL=0xc8ced6;
+  trackUnit(r,-1.38,4.9,0.82,0.72); trackUnit(r,1.38,4.9,0.82,0.72);
+  put(r, mesh(vBox(2.1,0.4,2.8), D), 0,0.62,0);
+  put(r, mesh(vCyl(1.2,1.2,0.26,22), G), 0,0.98,0);
+  const up=new THREE.Group(); up.position.set(0,1.1,0); r.add(up);
+  put(up, mesh(vBox(2.8,0.28,4.1), D), 0,0.14,0.55);                                   // üst şasi
+  put(up, mesh(vBox(1.55,1.2,2.5), Y), 0.62,0.88,1.05);                                // motor kaportası
+  put(up, mesh(vBox(1.3,0.7,0.04), 0xffffff, { map:vehTex.grille }), 0.62,0.9,2.32);
+  put(up, mesh(vBox(0.04,0.7,1.6), 0xffffff, { map:vehTex.grille }), 1.41,0.9,1.1);
+  put(up, mesh(vBox(2.8,1.05,0.85), YD), 0,0.82,2.75);                                 // karşı ağırlık
+  put(up, mesh(vBox(2.82,0.3,0.87), 0xffffff, { map:vehTex.hazard }), 0,0.45,2.76);
+  put(up, mesh(vCyl(0.07,0.07,1.0,8), D), 1.15,1.95,1.7); put(up, mesh(vCyl(0.1,0.07,0.16,8), D), 1.15,2.5,1.7);   // egzoz
+  [[1.38,-0.6],[1.38,1.6],[-1.38,1.6]].forEach(function(q){ put(up, mesh(vCyl(0.025,0.025,0.7,6), SIL), q[0],0.63,q[1]); });
+  put(up, mesh(vBox(0.04,0.04,2.2), SIL), 1.38,0.98,0.5); put(up, mesh(vBox(2.76,0.04,0.04), SIL), 0,0.98,1.6+0.0);
+  // kabin (sol ön)
+  const cab=new THREE.Group(); cab.position.set(-0.78,0.28,-0.5); up.add(cab);
+  put(cab, mesh(vBox(1.2,0.1,1.7), D), 0,0.05,0); put(cab, mesh(vBox(1.24,0.1,1.74), Y), 0,1.78,0);
+  [[-0.56,-0.81],[0.56,-0.81],[-0.56,0.81],[0.56,0.81]].forEach(function(q){ put(cab, mesh(vBox(0.08,1.7,0.08), Y), q[0],0.92,q[1]); });
+  put(cab, mesh(vBox(1.2,0.6,0.07), Y), 0,0.36,0.82); put(cab, mesh(vBox(0.07,0.55,1.7), Y), -0.57,0.34,0); put(cab, mesh(vBox(0.07,0.55,1.7), Y), 0.57,0.34,0);
+  put(cab, mesh(vBox(1.2,0.3,0.07), Y), 0,0.2,-0.82);
+  cab.add((function(){ const m=vGlass(vBox(1.04,1.3,0.03)); m.position.set(0,1.05,-0.82); return m; })());
+  cab.add((function(){ const m=vGlass(vBox(0.03,1.1,1.56)); m.position.set(-0.57,1.18,0); return m; })());
+  cab.add((function(){ const m=vGlass(vBox(0.03,1.1,1.56)); m.position.set(0.57,1.18,0); return m; })());
+  put(cab, mesh(vBox(0.9,0.2,0.28), D), 0,0.62,-0.6);                                  // gösterge paneli
+  put(cab, neon(vBox(0.5,0.1,0.02), 0x7dff9a), 0,0.66,-0.455);
+  put(cab, mesh(vBox(0.5,0.12,0.5), 0x2a2d33), 0,0.5,0.35); put(cab, mesh(vBox(0.5,0.7,0.1), 0x2a2d33), 0,0.9,0.62);
+  [-0.38,0.38].forEach(function(x){ put(cab, mesh(vCyl(0.02,0.02,0.3,6), D), x,0.72,0.0); put(cab, mesh(new THREE.SphereGeometry(0.045,8,6), 0xc8321e), x,0.89,0.0); });
+  [-0.36,0.36].forEach(function(x){ put(cab, mesh(vBox(0.2,0.12,0.1), D), x,1.9,-0.8); put(cab, neon(vBox(0.16,0.08,0.02), 0xfff2c0), x,1.9,-0.86); });
+  put(cab, mesh(vCyl(0.09,0.09,0.14,10), 0xff8a2a, { emissive:0xa04000 }), 0.3,1.92,0.5);
+  // bom, kol ve kepçe
+  const a=excav.arm; a.position.set(0.5,0.55,-1.15); up.add(a);
+  put(a, mesh(vBox(0.6,0.6,0.5), YD), 0,0,0.1);
+  put(a, mesh(vBox(0.4,0.52,3.9), Y), 0,0,-1.95);
+  put(a, mesh(vBox(0.44,0.3,1.2), YD), 0,0.2,-2.0);
+  put(a, mesh(vCyl(0.07,0.07,1.9,8), SIL), 0,-0.42,-1.2).rotation.x=1.25; put(a, mesh(vCyl(0.1,0.1,0.9,8), D), 0,-0.55,-0.75).rotation.x=1.25;
+  const st=new THREE.Group(); st.position.set(0,0,-3.9); st.rotation.x=-1.25; a.add(st); excav.stick=st;
+  put(st, mesh(vBox(0.3,0.38,2.9), Y), 0,0,-1.45);
+  put(st, mesh(vCyl(0.06,0.06,1.6,8), SIL), 0,0.3,-0.7).rotation.x=Math.PI/2; put(st, mesh(vCyl(0.09,0.09,0.8,8), D), 0,0.3,-0.2).rotation.x=Math.PI/2;
+  const bk=new THREE.Group(); bk.position.set(0,0,-2.9); st.add(bk); excav.bucket=bk;
+  const shell=put(bk, mesh(new THREE.CylinderGeometry(0.75,0.75,2.0,14,1,true,0,Math.PI*1.15), 0x3b3e44, { side:THREE.DoubleSide }), 0,-0.15,-0.55); shell.rotation.z=Math.PI/2; shell.rotation.y=0.3;
+  [-1.0,1.0].forEach(function(x){ const c=put(bk, mesh(new THREE.CircleGeometry(0.75,14,0,Math.PI*1.15), 0x34373c, { side:THREE.DoubleSide }), x,-0.15,-0.55); c.rotation.y=Math.PI/2; });
+  for(let i=-3;i<=3;i++) put(bk, mesh(new THREE.ConeGeometry(0.09,0.42,6), SIL), i*0.29,-0.72,-0.98).rotation.x=-2.3;
+  put(bk, mesh(vBox(0.5,0.3,0.4), YD), 0,0.2,-0.1);
+  a.rotation.x=0.42;
+  r.visible=false; scene.add(r);
+})();
+(function(){   // MARS BORER: paletli dev burgu (özgün tasarım)
+  const r=borer.root, HULL=0xe9e6df, OR=0xf26a1b, D=0x232528, G=0x4a4f58, SIL=0xc8ced6;
+  trackUnit(r,-1.55,5.8,0.98,0.88); trackUnit(r,1.55,5.8,0.98,0.88);
+  put(r, mesh(vBox(2.2,0.55,5.0), D), 0,0.82,0.3);
+  put(r, mesh(vBox(3.1,1.5,4.0), HULL), 0,1.95,0.95);                                  // gövde
+  put(r, mesh(vBox(3.14,0.3,4.04), OR), 0,2.25,0.95);
+  put(r, mesh(vBox(3.14,0.12,4.04), D), 0,1.25,0.95);
+  const nosePl=put(r, mesh(vBox(3.1,1.25,0.22), HULL), 0,2.25,-1.25); nosePl.rotation.x=0.42;      // eğimli ön zırh
+  put(r, mesh(vBox(2.3,0.75,1.9), HULL), 0,3.05,1.55);                                 // üst kabin
+  put(r, mesh(vBox(2.34,0.12,1.94), OR), 0,3.46,1.55);
+  put(r, mesh(vBox(2.0,0.42,0.05), 0x16283a), 0,3.08,0.585); put(r, mesh(vBox(0.05,0.42,1.4), 0x16283a), -1.16,3.08,1.5); put(r, mesh(vBox(0.05,0.42,1.4), 0x16283a), 1.16,3.08,1.5);
+  [-0.75,-0.25,0.25,0.75].forEach(function(x){ put(r, mesh(vBox(0.3,0.16,0.14), D), x,3.6,0.7); put(r, neon(vBox(0.24,0.1,0.02), 0xfff2c0), x,3.6,0.62); });
+  put(r, mesh(vBox(2.7,1.25,1.1), G), 0,1.95,3.4);                                     // motor bloğu
+  put(r, mesh(vBox(2.2,0.8,0.04), 0xffffff, { map:vehTex.grille }), 0,2.0,3.96);
+  put(r, mesh(vBox(2.72,0.3,1.12), 0xffffff, { map:vehTex.hazard }), 0,1.42,3.41);
+  [-0.85,0.85].forEach(function(x){ put(r, mesh(vCyl(0.13,0.13,1.5,10), D), x,3.2,3.3); put(r, mesh(vCyl(0.17,0.13,0.2,10), D), x,4.0,3.3); });
+  put(r, mesh(vCyl(0.11,0.11,0.2,10), 0xff3b2e, { emissive:0x8a1208 }), 0.9,3.62,2.2);
+  [-1.58,1.58].forEach(function(x){ for(let i=0;i<3;i++) put(r, mesh(vBox(0.06,0.7,0.9), G), x,1.9,-0.3+i*1.2); put(r, mesh(vBox(0.05,0.05,3.6), SIL), x*1.02,2.75,0.95); });
+  put(r, mesh(vCyl(1.62,1.62,0.55,24), G), 0,2.0,-1.45).rotation.x=Math.PI/2;           // burgu yatağı
+  put(r, neon(new THREE.TorusGeometry(1.5,0.05,6,36), 0xff8a2a), 0,2.0,-1.74);
+  const mount=new THREE.Group(); mount.position.set(0,2.0,-1.7); mount.rotation.x=-Math.PI/2-0.12; r.add(mount);
+  const sp=new THREE.Group(); mount.add(sp); borer.spin=sp;
+  const L=4.6, RB=1.3, RT=0.14;
+  put(sp, mesh(vCyl(RB+0.12,RB+0.12,0.25,22), D), 0,0.05,0);
+  put(sp, mesh(new THREE.CylinderGeometry(RT,RB,L,20), 0x9aa1ab), 0,0.15+L/2,0);        // konik gövde
+  const N=120, turns=7.5;                                                               // helis bıçaklar
+  for(let k=0;k<N;k++){ const t=k/N, ang=t*turns*Math.PI*2, rad=RB*(1-t)+RT*t+0.13*(1-t*0.6);
+    const pl=put(sp, mesh(vBox(0.34*(1-t*0.55), 0.06, Math.max(0.12,rad*0.5)), k%2?0xc9cfd7:0xb0b7c0, { flatShading:true }), Math.cos(ang)*rad, 0.2+t*L, Math.sin(ang)*rad);
+    pl.rotation.y=-ang; pl.rotation.z=0.22; }
+  put(sp, mesh(new THREE.ConeGeometry(0.16,0.55,10), SIL), 0,0.15+L+0.25,0);
+  r.visible=false; scene.add(r);
+})();
+function placeVehicle(v){
+  const p=new THREE.Vector3(v===borer?-8:-15,0,1.5); shop.localToWorld(p);
+  v.owned=true; v.x=p.x; v.z=p.z; v.yaw=shop.rotation.y+Math.PI; v.root.visible=true;
+}
+
+/* ============================== Uzay mekiği ============================== */
+const ship = new THREE.Group();
+const shipParts = { hull:new THREE.MeshLambertMaterial({ color:0xf2f0ea }), wing:null, fin:null, legs:[], y:0 };
+(function(){
+  const HM=shipParts.hull, D=0x2b2d33;
+  function hm(geo){ const m=new THREE.Mesh(geo,HM); m.castShadow=true; m.receiveShadow=true; return m; }
+  const fus=put(ship, hm(new THREE.CylinderGeometry(1.5,1.5,9,18)), 0,2.3,0); fus.rotation.z=Math.PI/2;
+  const nose=put(ship, hm(new THREE.ConeGeometry(1.5,2.8,18)), 5.9,2.3,0); nose.rotation.z=-Math.PI/2;
+  put(ship, mesh(new THREE.SphereGeometry(0.28,10,8), D), 7.2,2.3,0);
+  put(ship, mesh(new THREE.BoxGeometry(1.5,0.5,1.5), 0x1d2c3a), 4.6,3.35,0).rotation.z=-0.35;      // kokpit camı
+  put(ship, mesh(new THREE.BoxGeometry(8.6,0.5,2.2), D), 0,1.05,0);                                 // ısı kalkanı
+  const band=put(ship, mesh(new THREE.CylinderGeometry(1.53,1.53,0.5,18), 0xf26a1b), 2.6,2.3,0); band.rotation.z=Math.PI/2;
+  const band2=put(ship, mesh(new THREE.CylinderGeometry(1.53,1.53,0.22,18), 0xf26a1b), -3.2,2.3,0); band2.rotation.z=Math.PI/2;
+  shipParts.wing=put(ship, hm(new THREE.BoxGeometry(3.6,0.16,3.4)), -2,1.9,-2.9);
+  put(ship, hm(new THREE.BoxGeometry(3.6,0.16,3.4)), -2,1.9,2.9);
+  shipParts.fin=put(ship, hm(new THREE.BoxGeometry(2.2,2.4,0.16)), -3.6,4.6,0);
+  [[-0.75,0],[0.75,0],[0,0.9]].forEach(function(e,i){ const c=put(ship, mesh(new THREE.CylinderGeometry(0.42,0.6,0.9,12), D), -4.9,2.3+e[1]-0.3,e[0]); c.rotation.z=Math.PI/2; });
+  [[3,-1.2],[3,1.2],[-3,-1.2],[-3,1.2]].forEach(function(q){ const l=put(ship, mesh(new THREE.CylinderGeometry(0.09,0.09,1.1,8), 0x9aa0a8), q[0],0.55,q[1]); const f=put(ship, mesh(new THREE.CylinderGeometry(0.32,0.36,0.1,10), 0x9aa0a8), q[0],0.05,q[1]); shipParts.legs.push(l,f); });
+  put(ship, mesh(new THREE.BoxGeometry(1.05,1.75,0.3), 0x0c0d10), 0.6,2.1,-1.38);                   // açık kapı
+  const door=put(ship, hm(new THREE.BoxGeometry(1.05,1.75,0.08)), 1.5,2.1,-1.75); door.rotation.y=0.9;
+  const ramp=put(ship, mesh(new THREE.BoxGeometry(1.15,0.08,2.9), 0x8d939b), 0.6,0.62,-2.75); ramp.rotation.x=-0.41;
+  shipParts.y=hAt(SHIP.x,SHIP.z);
+  ship.position.set(SHIP.x-0.6, shipParts.y, SHIP.z);
+  scene.add(ship);
+})();
+const HULL_CLEAN=new THREE.Color(0xf2f0ea), HULL_BURNT=new THREE.Color(0x8d857b);
+(function(){   // tamir edilince görünen parçalar
+  shipParts.glows=[]; [[-0.75,0],[0.75,0],[0,0.9]].forEach(function(e){ const g=put(ship, neon(new THREE.CircleGeometry(0.5,16), 0x7fe3ff, { side:THREE.DoubleSide }), -5.38,2.0+e[1],e[0]); g.rotation.y=Math.PI/2; g.visible=false; shipParts.glows.push(g); });
+  shipParts.dish=new THREE.Group(); shipParts.dish.position.set(1.2,3.8,0); ship.add(shipParts.dish);
+  put(shipParts.dish, mesh(new THREE.CylinderGeometry(0.05,0.05,0.7,6), 0xc8ced6), 0,0.3,0);
+  const d=put(shipParts.dish, mesh(new THREE.SphereGeometry(0.6,14,8,0,Math.PI*2,0,1.0), 0xf2f0ea, { side:THREE.DoubleSide }), 0,0.95,0); d.rotation.x=Math.PI-0.5;
+  shipParts.dish.visible=false;
+})();
+function partK(i){ return S.wreck*(S.parts[i]===2?0:1); }
+function applyShip(){
+  const ks=partK(0), kh=partK(1), kw=partK(2), kf=partK(3);
+  ship.rotation.x=0.2*ks; ship.rotation.z=-0.07*ks; ship.position.y=shipParts.y-0.62*ks;
+  for(let i=0;i<shipParts.legs.length;i++) shipParts.legs[i].visible=ks<0.4;
+  shipParts.hull.color.copy(HULL_CLEAN).lerp(HULL_BURNT,kh);
+  shipParts.wing.position.set(-2-0.5*kw, 1.9-kw*(1.78-0.62*ks), -2.9-0.9*kw); shipParts.wing.rotation.set(-0.45*kw*ks, 0.3*kw, 0);
+  shipParts.fin.rotation.x=0.55*kf; shipParts.fin.position.y=4.6-0.5*kf;
+  const eng=S.parts[4]===2; for(let i=0;i<shipParts.glows.length;i++) shipParts.glows[i].visible=eng;
+  shipParts.dish.visible=S.parts[5]===2;
+}
+// duman
+const SMAX=70, smP=new Float32Array(SMAX*3), smV=new Float32Array(SMAX*3), smL=new Float32Array(SMAX); let smNext=0, smT=0;
+for(let i=0;i<SMAX;i++) smP[i*3+1]=-999;
+const smAttr=new THREE.BufferAttribute(smP,3); smAttr.setUsage(THREE.DynamicDrawUsage);
+const smoke=(function(){ const g=new THREE.BufferGeometry(); g.setAttribute('position',smAttr);
+  const c=document.createElement('canvas'); c.width=c.height=64; const x=c.getContext('2d'); const gr=x.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.5,'rgba(255,255,255,0.55)'); gr.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=gr; x.fillRect(0,0,64,64);
+  const m=new THREE.Points(g,new THREE.PointsMaterial({ size:2.6, map:new THREE.CanvasTexture(c), color:0x3d3835, transparent:true, opacity:0.5, depthWrite:false })); m.frustumCulled=false; scene.add(m); return m; })();
+function updateSmoke(dt){
+  if(S.wreck>0.5 && S.parts[4]!==2){ smT-=dt; if(smT<=0){ smT=0.11; const i=smNext; smNext=(smNext+1)%SMAX;
+    smP[i*3]=SHIP.x-4.5+Math.random()*5; smP[i*3+1]=shipParts.y+2.4+Math.random()*0.6; smP[i*3+2]=SHIP.z+(Math.random()-0.5)*1.6;
+    smV[i*3]=0.5+Math.random()*0.5; smV[i*3+1]=1.3+Math.random()*1.2; smV[i*3+2]=(Math.random()-0.5)*0.4; smL[i]=4+Math.random()*2.5; } }
+  for(let i=0;i<SMAX;i++){ if(smL[i]<=0) continue; smL[i]-=dt; if(smL[i]<=0){ smP[i*3+1]=-999; continue; }
+    smP[i*3]+=smV[i*3]*dt; smP[i*3+1]+=smV[i*3+1]*dt; smP[i*3+2]+=smV[i*3+2]*dt; }
+  smAttr.needsUpdate=true;
+}
+
+/* ============================== Dustfall Colony ============================== */
+function makeAstronaut(suit, accent){
+  const g=new THREE.Group();
+  put(g, mesh(new THREE.CylinderGeometry(0.12,0.13,0.82,8), suit), -0.15,0.41,0); put(g, mesh(new THREE.CylinderGeometry(0.12,0.13,0.82,8), suit), 0.15,0.41,0);
+  put(g, mesh(new THREE.BoxGeometry(0.2,0.12,0.34), 0x555a62), -0.15,0.06,0.05); put(g, mesh(new THREE.BoxGeometry(0.2,0.12,0.34), 0x555a62), 0.15,0.06,0.05);
+  put(g, mesh(new THREE.BoxGeometry(0.56,0.66,0.36), suit), 0,1.12,0);
+  put(g, mesh(new THREE.BoxGeometry(0.3,0.2,0.05), accent), 0,1.2,0.19);
+  put(g, mesh(new THREE.BoxGeometry(0.46,0.7,0.24), 0xcfd3d8), 0,1.18,-0.29);
+  put(g, mesh(new THREE.SphereGeometry(0.29,14,10), suit), 0,1.68,0);
+  put(g, mesh(new THREE.SphereGeometry(0.22,12,8), 0x2a1f0a, { emissive:0x6a4a10 }), 0,1.69,0.12);
+  put(g, mesh(new THREE.CylinderGeometry(0.09,0.085,0.62,8), suit), -0.38,1.1,0).rotation.z=-0.15; put(g, mesh(new THREE.CylinderGeometry(0.09,0.085,0.62,8), suit), 0.38,1.1,0).rotation.z=0.15;
+  return g;
+}
+const colony = new THREE.Group();
+const bolt = { head:new THREE.Group(), talk:0 };
+const COL_OBS = [[4.5,2.5,0.55],[-6.5,7.5,0.55],[0,-7,5.7],[10,-1,4.3],[-10,-3,4.7],[-2,4.9,2.5],[13,-11,1.0],[-14,6.5,2.9],[7,6.5,1.9]];
+(function(){
+  colony.position.set(COLONY.x, hAt(COLONY.x,COLONY.z), COLONY.z);
+  const WH=0xe8e6e0, GR=0x8b929c, DK=0x2b3038;
+  function C(m,x,y,z){ return put(colony,m,x,y,z); }
+  function dome(x, z, r, glass){
+    C(mesh(new THREE.CylinderGeometry(r+0.25,r+0.4,0.7,24), GR), x,0.35,z);
+    const geo=new THREE.SphereGeometry(r,28,14,0,Math.PI*2,0,Math.PI/2);
+    const d = glass ? new THREE.Mesh(geo, new THREE.MeshPhongMaterial({ color:0x9fe0b8, transparent:true, opacity:0.3, shininess:120, specular:0xffffff, depthWrite:false, side:THREE.DoubleSide })) : mesh(geo, WH);
+    d.position.set(x,0.7,z); colony.add(d);
+    if(!glass){
+      for(let i=0;i<10;i++){ const a=i/10*6.283; const w=C(neon(new THREE.BoxGeometry(0.7,0.42,0.08), 0xffd27a), x+Math.sin(a)*r*0.94, 0.7+r*0.36, z+Math.cos(a)*r*0.94); w.rotation.order='YXZ'; w.rotation.y=a; w.rotation.x=-0.37; }
+      C(mesh(new THREE.CylinderGeometry(r*0.18,r*0.22,0.35,12), GR), x,0.7+r,z);
+      C(neon(new THREE.TorusGeometry(r+0.3,0.04,6,40), 0x4fd8ff), x,0.72,z).rotation.x=Math.PI/2;
+    }
+  }
+  function tube(ax,az,ar,bx,bz,br){ const dx=bx-ax, dz=bz-az, l=Math.hypot(dx,dz), ux=dx/l, uz=dz/l, x1=ax+ux*(ar-0.4), z1=az+uz*(ar-0.4), x2=bx-ux*(br-0.4), z2=bz-uz*(br-0.4), len=Math.hypot(x2-x1,z2-z1);
+    const g=new THREE.CylinderGeometry(0.95,0.95,len,14); g.rotateX(Math.PI/2); const m=C(mesh(g,WH),(x1+x2)/2,1.35,(z1+z2)/2); m.rotation.y=Math.atan2(dx,dz); }
+  dome(0,-7,5,false); dome(10,-1,3.6,false); dome(-10,-3,4,true);
+  tube(0,-7,5,10,-1,3.6); tube(0,-7,5,-10,-3,4);
+  C(mesh(new THREE.CylinderGeometry(3.7,3.7,0.12,24), 0x6a4630), -10,0.76,-3);                          // sera toprağı
+  for(let i=0;i<16;i++){ const a=rand()*6.283, rr=Math.sqrt(rand())*3.1, hh=0.5+rand()*1.1;
+    C(mesh(new THREE.CylinderGeometry(0.03,0.04,hh,5), 0x4a7a3a), -10+Math.cos(a)*rr,0.82+hh/2,-3+Math.sin(a)*rr);
+    C(mesh(new THREE.SphereGeometry(0.22+rand()*0.2,8,6), rand()<0.25?0xd8483a:0x4fae5a), -10+Math.cos(a)*rr,0.9+hh,-3+Math.sin(a)*rr); }
+  C(mesh(new THREE.BoxGeometry(1.9,2.3,1.8), GR), 0,1.5,-1.7);                                          // hava kilidi
+  C(mesh(new THREE.BoxGeometry(1.2,1.9,0.06), DK), 0,1.4,-0.78);
+  C(neon(new THREE.BoxGeometry(1.36,0.06,0.04), 0x4fd8ff), 0,2.4,-0.76); C(neon(new THREE.BoxGeometry(0.06,1.96,0.04), 0x4fd8ff), -0.66,1.4,-0.76); C(neon(new THREE.BoxGeometry(0.06,1.96,0.04), 0x4fd8ff), 0.66,1.4,-0.76);
+  // haberleşme kulesi
+  C(mesh(new THREE.CylinderGeometry(0.12,0.22,15,8), GR), 13,7.5,-11);
+  for(let i=1;i<=4;i++) C(mesh(new THREE.TorusGeometry(0.5-i*0.06,0.03,5,12), GR), 13,i*3,-11).rotation.x=Math.PI/2;
+  const dsh=C(mesh(new THREE.SphereGeometry(1.4,16,8,0,Math.PI*2,0,0.95), WH, { side:THREE.DoubleSide }), 13.6,12.2,-11); dsh.rotation.set(-2.0,0,-0.5);
+  const tl=C(neon(new THREE.SphereGeometry(0.14,8,6), 0xff3b2e), 13,15.15,-11); anims.push(function(t){ tl.visible=((t+0.4)%1.4)<0.5; });
+  // güneş panelleri
+  const sol=solarTexture();
+  for(let i=0;i<4;i++){ const x=-6+i*4.3; C(mesh(new THREE.CylinderGeometry(0.08,0.08,1.6,6), GR), x,0.8,11); C(mesh(new THREE.BoxGeometry(3.5,0.08,1.9), 0xffffff, { map:sol }), x,1.75,11).rotation.x=0.5; }
+  // tanklar
+  [5,8].forEach(function(z){ const t=C(mesh(new THREE.CylinderGeometry(1.1,1.1,4.2,16), WH), -14,1.4,z); t.rotation.z=Math.PI/2; const b=C(mesh(new THREE.CylinderGeometry(1.13,1.13,0.4,16), 0xf26a1b), -14,1.4,z); b.rotation.z=Math.PI/2; C(mesh(new THREE.BoxGeometry(3.4,0.5,0.5), DK), -14,0.25,z); });
+  // keşif aracı
+  C(mesh(new THREE.BoxGeometry(1.6,0.6,2.6), WH), 7,0.95,6.5); C(mesh(new THREE.BoxGeometry(1.2,0.5,1.0), 0x22384a), 7,1.45,5.9);
+  for(let i=-1;i<=1;i++){ C(mesh(new THREE.CylinderGeometry(0.42,0.42,0.3,12), DK), 6.05,0.42,6.5+i*1.0).rotation.z=Math.PI/2; C(mesh(new THREE.CylinderGeometry(0.42,0.42,0.3,12), DK), 7.95,0.42,6.5+i*1.0).rotation.z=Math.PI/2; }
+  C(mesh(new THREE.CylinderGeometry(0.03,0.03,1.3,5), GR), 7.5,1.85,7.4); C(mesh(new THREE.BoxGeometry(0.3,0.16,0.2), DK), 7.5,2.55,7.4);
+  // iniş pisti
+  C(mesh(new THREE.CylinderGeometry(5,5,0.12,28), DK), 16,0.06,7);
+  C(neon(new THREE.TorusGeometry(4.5,0.06,6,40), 0xff8a2a), 16,0.14,7).rotation.x=Math.PI/2; C(neon(new THREE.TorusGeometry(2.2,0.05,6,32), 0xffffff), 16,0.14,7).rotation.x=Math.PI/2;
+  const padL=[]; for(let i=0;i<8;i++){ const a=i/8*6.283; padL.push(C(neon(new THREE.SphereGeometry(0.1,6,5), 0x7dff9a), 16+Math.cos(a)*4.9,0.2,7+Math.sin(a)*4.9)); }
+  anims.push(function(t){ const k=Math.floor(t*4)%8; for(let i=0;i<8;i++) padL[i].visible=(i!==k); });
+  // parça deposu ve BOLT
+  C(mesh(new THREE.CylinderGeometry(2.7,2.9,0.3,8), DK), -2,0.15,5);
+  C(mesh(new THREE.BoxGeometry(3.3,1.0,0.7), GR), -2,0.8,6.2); C(mesh(new THREE.BoxGeometry(3.5,0.08,0.9), 0x12161c), -2,1.32,6.2);
+  C(neon(new THREE.BoxGeometry(3.1,0.06,0.02), 0x7dff9a), -2,1.0,6.56);
+  C(mesh(new THREE.BoxGeometry(3.6,2.5,0.3), DK), -2,1.55,3.7);
+  C(mesh(new THREE.CylinderGeometry(0.3,0.3,0.9,12), 0x8b929c), -3.1,1.5,3.95); C(neon(new THREE.CylinderGeometry(0.2,0.2,0.92,10), 0x7fe3ff), -3.1,1.5,3.95);
+  C(mesh(new THREE.BoxGeometry(0.9,0.06,0.5), WH), -2,2.1,3.95).rotation.z=0.3; C(mesh(new THREE.BoxGeometry(0.7,0.7,0.1), 0xc8ced6), -0.9,1.3,3.9);
+  C(mesh(new THREE.CylinderGeometry(0.05,0.05,1.2,6), 0xc8ced6), -1.9,0.95,3.95); C(mesh(new THREE.CylinderGeometry(0.05,0.05,1.2,6), 0xc8ced6), -2.2,0.95,3.95);
+  [-3.7,-0.3].forEach(function(x){ C(mesh(new THREE.BoxGeometry(0.18,3.0,0.18), GR), x,1.5,3.9); C(mesh(new THREE.CylinderGeometry(0.05,0.05,2.9,6), 0xc8ced6), x,1.45,6.5); });
+  C(mesh(new THREE.BoxGeometry(4.2,0.14,3.4), DK), -2,3.05,5.1); C(neon(new THREE.BoxGeometry(4.0,0.05,0.05), 0x7dff9a), -2,2.96,6.78);
+  const ps=new THREE.Mesh(new THREE.PlaneGeometry(4.0,0.95), holoMat(640,152,function(g,w,h){ glowText(g,'PARTS DEPOT',w/2,76,'900 70px Orbitron, Arial','#7dff9a'); }));
+  ps.position.set(-2,3.85,5.6); colony.add(ps); anims.push(function(t){ ps.position.y=3.85+Math.sin(t*1.2+1)*0.07; });
+  const b=new THREE.Group(); b.position.set(-2,0.3,5.2); colony.add(b);
+  put(b, mesh(new THREE.BoxGeometry(0.85,0.32,0.65), DK), 0,0.16,0);
+  put(b, mesh(new THREE.BoxGeometry(0.7,0.8,0.46), 0xd8dce2), 0,0.78,0);
+  put(b, neon(new THREE.BoxGeometry(0.4,0.14,0.02), 0xff8a2a), 0,0.9,0.24);
+  put(b, mesh(new THREE.CylinderGeometry(0.07,0.07,0.7,8), 0x8b929c), -0.45,0.85,0.15).rotation.x=1.0; put(b, mesh(new THREE.CylinderGeometry(0.07,0.07,0.7,8), 0x8b929c), 0.45,0.85,0.15).rotation.x=1.0;
+  const hd=bolt.head; hd.position.set(0,1.5,0); b.add(hd);
+  put(hd, mesh(new THREE.BoxGeometry(0.56,0.4,0.42), 0xeef0f3), 0,0,0);
+  put(hd, mesh(new THREE.BoxGeometry(0.44,0.2,0.02), 0x0c1016), 0,0.02,0.215);
+  bolt.eye=put(hd, neon(new THREE.SphereGeometry(0.075,10,8), 0x4fd8ff), 0,0.02,0.23);
+  put(hd, mesh(new THREE.CylinderGeometry(0.015,0.015,0.3,5), 0x8b929c), 0.18,0.35,0); put(hd, neon(new THREE.SphereGeometry(0.035,6,5), 0xff3b2e), 0.18,0.52,0);
+  // koloni sakinleri
+  const a1=makeAstronaut(0xe8e6e0,0x2a9df4); a1.position.set(4.5,0,2.5); a1.rotation.y=-0.9; colony.add(a1);
+  const a2=makeAstronaut(0xf0c040,0x22384a); a2.position.set(-6.5,0,7.5); a2.rotation.y=0.7; colony.add(a2);
+  anims.push(function(t){ a1.rotation.y=-0.9+Math.sin(t*0.5)*0.3; a2.position.y=Math.abs(Math.sin(t*1.1))*0.05; });
+  scene.add(colony);
+})();
+beacon(SHOP.x, SHOP.z, 0xff9a3c); beacon(COLONY.x, COLONY.z, 0x4fd8ff); beacon(SHIP.x, SHIP.z, 0xffffff);
+
+/* ============================== Mekiğin içi ============================== */
+const interior = new THREE.Group();
+const intL = { a:null, b:null, c:null, alarm:null };
+const sysCanvas=document.createElement('canvas'); sysCanvas.width=512; sysCanvas.height=384; const sysTex=new THREE.CanvasTexture(sysCanvas);
+const comCanvas=document.createElement('canvas'); comCanvas.width=384; comCanvas.height=256; const comTex=new THREE.CanvasTexture(comCanvas);
+function drawSys(){
+  const g=sysCanvas.getContext('2d'); g.fillStyle='#04121c'; g.fillRect(0,0,512,384); g.strokeStyle='#1d5a78'; g.lineWidth=3; g.strokeRect(6,6,500,372);
+  g.textAlign='left'; g.textBaseline='alphabetic'; g.fillStyle='#7fe3ff'; g.font='700 30px Orbitron, Arial'; g.fillText(T('SHUTTLE SYSTEMS'),24,50);
+  for(let i=0;i<PARTS.length;i++){ const st=S.parts[i]; g.font='500 25px Rubik, Arial'; g.fillStyle=st===2?'#7dff9a':(st===1?'#ffd27a':'#ff6a5a'); g.fillText((st===2?T('[ OK ]'):(st===1?T('[READY]'):T('[FAIL]')))+'   '+T(PARTS[i].name), 24, 104+i*46); }
+  sysTex.needsUpdate=true;
+}
+function drawCom(){
+  const g=comCanvas.getContext('2d'); g.fillStyle='#04121c'; g.fillRect(0,0,384,256); g.strokeStyle='#1d5a78'; g.lineWidth=3; g.strokeRect(6,6,372,244);
+  g.textAlign='left'; g.textBaseline='alphabetic'; g.fillStyle='#7fe3ff'; g.font='700 30px Orbitron, Arial'; g.fillText(T('COMMS LINK'),22,52);
+  g.font='500 24px Rubik, Arial';
+  if(S.unread>0){ g.fillStyle='#ffd27a'; g.fillText('> '+F('{0} NEW MESSAGE', S.unread),22,112); } else if(S.pending.length){ g.fillStyle='#7fe3ff'; g.fillText('> '+T('SIGNAL IN TRANSIT'),22,112); } else { g.fillStyle='#7dff9a'; g.fillText('> '+T('STANDBY'),22,112); }
+  g.fillStyle='#9fb6c8'; g.fillText(T('EARTH: 12.5 LIGHT-MIN'),22,160); g.fillStyle='#ffb35a'; g.fillText(T('PRESS E TO OPEN'),22,214);
+  comTex.needsUpdate=true;
+}
+(function(){
+  interior.position.set(INT.x,INT.y,INT.z);
+  function P(geo,color,x,y,z,o){ const m=new THREE.Mesh(geo,new THREE.MeshPhongMaterial(Object.assign({ color:color, shininess:35 },o||{}))); m.position.set(x,y,z); interior.add(m); return m; }
+  function Nn(geo,color,x,y,z,o){ const m=neon(geo,color,o); m.position.set(x,y,z); interior.add(m); return m; }
+  function B(w,h,d){ return new THREE.BoxGeometry(w,h,d); }
+  const W2=2.2, L2=6, HH=2.7, HC=0x5b6573, DK=0x23272e, LT=0x8c96a3;
+  P(B(4.6,0.2,12.4),DK,0,-0.1,0); P(B(1.7,0.02,12),0x3b424d,0,0.01,0);
+  Nn(B(0.05,0.02,11.6),0x4fd8ff,-0.9,0.025,0); Nn(B(0.05,0.02,11.6),0x4fd8ff,0.9,0.025,0);
+  for(let z=-5.5;z<=5.5;z+=0.5) P(B(1.6,0.012,0.04),0x2a2f37,0,0.022,z);                              // ızgara çizgileri
+  P(B(4.6,0.2,12.4),HC,0,HH+0.1,0);
+  P(B(0.2,HH,12.4),HC,-W2-0.1,HH/2,0); P(B(0.2,HH,12.4),HC,W2+0.1,HH/2,0);
+  P(B(4.6,HH,0.2),HC,0,HH/2,L2+0.1); P(B(4.6,HH,0.2),HC,0,HH/2,-L2-0.1);
+  [-1,1].forEach(function(sd){ P(B(0.95,0.12,12.2),0x4a525e,sd*1.85,HH-0.32,0).rotation.z=-sd*0.785; P(B(0.5,0.1,12.2),0x4a525e,sd*2.0,0.17,0).rotation.z=sd*0.785; });
+  for(let z=-4;z<=4;z+=2){ P(B(0.22,HH,0.3),LT,-W2+0.1,HH/2,z); P(B(0.22,HH,0.3),LT,W2-0.1,HH/2,z); P(B(4.4,0.2,0.3),LT,0,HH-0.1,z);
+    Nn(B(0.05,0.5,0.31),0xff8a2a,-W2+0.22,1.4,z); Nn(B(0.05,0.5,0.31),0xff8a2a,W2-0.22,1.4,z); }
+  for(let z=-3;z<=5;z+=2) Nn(B(0.7,0.04,1.1),0xdff4ff,0,HH-0.015,z);                                   // tavan ışıkları
+  [[-2.06,2.2,0xb87333],[-2.06,2.02,0x9aa3ad],[2.06,2.2,0x9aa3ad],[2.06,0.5,0xb87333]].forEach(function(q){ const g=new THREE.CylinderGeometry(0.055,0.055,12,8); g.rotateX(Math.PI/2); P(g,q[2],q[0],q[1],0,{shininess:90}); });
+  const dotC=[0x7dff9a,0xff6a5a,0xffd27a,0x4fd8ff], dots=[];
+  for(let z=-3;z<=5;z+=2) [-1,1].forEach(function(sd){ if((sd>0 && z===1) || (sd<0 && (z===3||z===-1))) return;
+    P(B(0.06,1.5,1.5),0x4f5864,sd*(W2-0.04),1.2,z); P(B(0.07,0.5,1.1),0x2c323b,sd*(W2-0.05),1.55,z);
+    for(let k=0;k<5;k++) dots.push(Nn(B(0.075,0.05,0.05),dotC[Math.floor(rand()*4)],sd*(W2-0.05),1.42+Math.floor(k/3)*0.16,z-0.36+(k%3)*0.2)); });
+  anims.push(function(t){ const k=Math.floor(t*3); for(let i=0;i<dots.length;i++) dots[i].visible=((i*7+k)%5)!==0; });
+  // dolaplar (sol, z=3)
+  P(B(0.5,1.95,1.6),0x3f4752,-1.9,0.98,3); for(let i=-1;i<=1;i++){ P(B(0.04,1.8,0.48),0x566070,-1.64,0.98,3+i*0.52); Nn(B(0.045,0.05,0.12),0x7dff9a,-1.63,1.7,3+i*0.52); }
+  // kriyo kapsül (sol, z=-1)
+  P(new THREE.CylinderGeometry(0.52,0.52,2.1,18),0xdfe3e8,-1.72,1.05,-1); P(new THREE.CylinderGeometry(0.58,0.58,0.16,18),0x3f4752,-1.72,0.08,-1);
+  P(B(0.08,1.35,0.72),0x7fe3ff,-1.2,1.15,-1,{ transparent:true, opacity:0.35, shininess:120 }); Nn(new THREE.TorusGeometry(0.56,0.025,6,24),0x4fd8ff,-1.72,0.2,-1).rotation.x=Math.PI/2;
+  Nn(B(0.05,0.1,0.3),0xff6a5a,-1.18,1.95,-1);
+  // tamir istasyonu (sağ, z=1)
+  P(B(0.8,0.9,1.9),0x444c57,1.8,0.45,1); P(B(0.84,0.05,1.94),0x1b1f25,1.8,0.925,1); Nn(B(0.02,0.05,1.8),0xff8a2a,1.39,0.8,1);
+  P(B(0.3,0.12,0.5),0xc8321e,1.75,1.01,0.45); P(new THREE.CylinderGeometry(0.03,0.03,0.5,6),0xc8ced6,1.7,0.98,1.4).rotation.x=Math.PI/2; P(B(0.2,0.2,0.2),0x8c96a3,1.9,1.05,1.0);
+  const rs=new THREE.Mesh(new THREE.PlaneGeometry(1.5,1.12), new THREE.MeshBasicMaterial({ map:sysTex })); rs.position.set(2.13,1.78,1); rs.rotation.y=-Math.PI/2; interior.add(rs);
+  P(B(0.06,1.24,1.62),0x1b1f25,2.17,1.78,1);
+  // kahve makinesi (sağ, z=3.2) - en önemli sistem
+  P(B(0.5,0.9,0.6),0x444c57,1.9,0.45,3.2); P(B(0.36,0.5,0.4),0x1b1f25,1.9,1.15,3.2); Nn(B(0.02,0.08,0.2),0x7dff9a,1.71,1.25,3.2); P(new THREE.CylinderGeometry(0.06,0.05,0.12,10),0xf2f0ea,1.78,0.96,3.2);
+  // çıkış kapağı (arka, z=+6)
+  const hatch=P(new THREE.CylinderGeometry(0.95,0.95,0.12,24),0x6d7682,0,1.25,5.96); hatch.rotation.x=Math.PI/2;
+  P(new THREE.CylinderGeometry(0.22,0.22,0.2,12),0x3f4752,0,1.25,5.88).rotation.x=Math.PI/2; P(B(0.9,0.08,0.1),0xc8ced6,0,1.25,5.82);
+  Nn(new THREE.TorusGeometry(1.02,0.035,6,36),0x7dff9a,0,1.25,5.94);
+  const ex=new THREE.Mesh(new THREE.PlaneGeometry(1.0,0.34), holoMat(256,88,function(g,w,h){ g.fillStyle='rgba(4,24,12,0.9)'; g.fillRect(0,0,w,h); glowText(g,'EXIT',w/2,46,'900 54px Orbitron, Arial','#7dff9a'); }));
+  ex.position.set(0,2.42,5.9); ex.rotation.y=Math.PI; interior.add(ex);
+  // kokpit
+  P(B(4.4,0.12,2.5),0x2c323b,0,0.06,-4.75);
+  [-0.8,0.8].forEach(function(x){ P(new THREE.CylinderGeometry(0.12,0.2,0.45,10),0x3f4752,x,0.33,-4.2); P(B(0.62,0.14,0.62),0x2a2d33,x,0.6,-4.2); P(B(0.62,0.95,0.14),0x2a2d33,x,1.1,-3.9); P(B(0.4,0.25,0.12),0x3a3d44,x,1.68,-3.9);
+    Nn(B(0.64,0.03,0.03),0xff8a2a,x,1.58,-3.82); P(new THREE.CylinderGeometry(0.025,0.025,0.3,6),0x1b1f25,x+0.42,0.82,-4.4); P(new THREE.SphereGeometry(0.05,8,6),0xc8321e,x+0.42,0.99,-4.4); });
+  P(B(4.2,0.85,1.0),0x3a424d,0,0.5,-5.45); P(B(4.2,0.08,1.12),0x14181e,0,0.99,-5.4).rotation.x=0.25;
+  const radar=textTexture(256,256,function(g,w,h){ g.fillStyle='#04121c'; g.fillRect(0,0,w,h); g.strokeStyle='#2fae6a'; g.lineWidth=2; for(let r=30;r<=120;r+=30){ g.beginPath(); g.arc(128,128,r,0,6.3); g.stroke(); } g.beginPath(); g.moveTo(8,128); g.lineTo(248,128); g.moveTo(128,8); g.lineTo(128,248); g.stroke(); g.fillStyle='#7dff9a'; g.beginPath(); g.arc(170,96,6,0,6.3); g.fill(); g.fillStyle='#ffb35a'; g.beginPath(); g.arc(92,160,5,0,6.3); g.fill(); });
+  [[-1.35,sysTex,1.15,0.86],[0,comTex,1.15,0.77],[1.35,radar,0.86,0.86]].forEach(function(q){ const m=new THREE.Mesh(new THREE.PlaneGeometry(q[2],q[3]), new THREE.MeshBasicMaterial({ map:q[1] })); m.position.set(q[0],1.2,-5.32); m.rotation.x=-0.9; interior.add(m); });
+  for(let i=0;i<14;i++) Nn(B(0.07,0.03,0.07),dotC[i%4],-1.9+i*0.29,1.0,-4.98);
+  const view=textTexture(1024,384,function(g,w,h){ const gr=g.createLinearGradient(0,0,0,h*0.62); gr.addColorStop(0,'#2d2f52'); gr.addColorStop(0.55,'#8f5d57'); gr.addColorStop(1,'#dca472'); g.fillStyle=gr; g.fillRect(0,0,w,h);
+    g.fillStyle='rgba(255,255,255,0.6)'; for(let i=0;i<70;i++) g.fillRect(rand()*w, rand()*h*0.3, 2, 2);
+    g.fillStyle='#4a82d8'; g.beginPath(); g.arc(210,70,22,0,6.3); g.fill();
+    g.fillStyle='#9a4a2c'; g.beginPath(); g.moveTo(260,h*0.66); g.lineTo(430,h*0.3); g.lineTo(520,h*0.2); g.lineTo(600,h*0.27); g.lineTo(700,h*0.42); g.lineTo(820,h*0.66); g.fill();
+    g.fillStyle='#b25a34'; g.beginPath(); g.moveTo(0,h*0.66); g.lineTo(120,h*0.5); g.lineTo(240,h*0.66); g.fill(); g.beginPath(); g.moveTo(800,h*0.66); g.lineTo(930,h*0.52); g.lineTo(w,h*0.6); g.lineTo(w,h*0.66); g.fill();
+    g.fillStyle='#c0683a'; g.fillRect(0,h*0.62,w,h*0.38); g.fillStyle='rgba(60,20,10,0.25)'; for(let i=0;i<120;i++) g.fillRect(rand()*w, h*0.64+rand()*h*0.36, 6+rand()*14, 2); });
+  const wv=new THREE.Mesh(new THREE.PlaneGeometry(4.0,1.4), new THREE.MeshBasicMaterial({ map:view })); wv.position.set(0,1.95,-5.97); interior.add(wv);
+  [-0.68,0.68].forEach(function(x){ P(B(0.1,1.5,0.1),0x2c323b,x,1.95,-5.92); }); P(B(4.2,0.12,0.14),0x2c323b,0,1.22,-5.92); P(B(4.2,0.14,0.14),0x2c323b,0,2.66,-5.92);
+  P(B(2.6,0.12,1.3),0x2c323b,0,HH-0.2,-4.7); for(let i=0;i<10;i++) Nn(B(0.06,0.03,0.06),dotC[(i*3)%4],-1.0+i*0.22,HH-0.27,-4.5);
+  intL.a=new THREE.PointLight(0xcfeaff,0,12,1.4); intL.a.position.set(0,2.35,3); interior.add(intL.a);
+  intL.b=new THREE.PointLight(0xcfeaff,0,12,1.4); intL.b.position.set(0,2.35,-1.2); interior.add(intL.b);
+  intL.c=new THREE.PointLight(0xffb070,0,8,1.4); intL.c.position.set(0,1.9,-4.5); interior.add(intL.c);
+  intL.alarm=new THREE.PointLight(0xff2a18,0,10,1.4); intL.alarm.position.set(0,2.3,0.8); interior.add(intL.alarm);
+  scene.add(interior);
+})();
+const STATIONS = [ { id:'comms', x:0, z:-4.3, r:1.8, label:'Use comms console' }, { id:'repair', x:1.3, z:1.0, r:1.4, label:'Repair station' }, { id:'cryo', x:-1.2, z:-1.0, r:1.2, label:'Inspect cryo pod' }, { id:'coffee', x:1.3, z:3.2, r:1.0, label:'Coffee machine' }, { id:'log', x:-1.2, z:3.0, r:1.1, label:'Read flight log' } ];
+function nearStation(){ const lx=S.px-INT.x, lz=S.pz-INT.z; let best=null, bd=9; for(let i=0;i<STATIONS.length;i++){ const st=STATIONS[i], d=Math.hypot(lx-st.x,lz-st.z); if(d<st.r && d<bd){ bd=d; best=st; } } return best; }
+const NPCS = [ { x:COLONY.x+4.5, z:COLONY.z+2.5, i:0, lines:NPC_LINES[0] }, { x:COLONY.x-6.5, z:COLONY.z+7.5, i:0, lines:NPC_LINES[1] } ];
+function nearNpc(){ for(let i=0;i<NPCS.length;i++) if(Math.hypot(S.px-NPCS[i].x,S.pz-NPCS[i].z)<2.9) return NPCS[i]; return null; }
+// Mekik rampası: üzerinde yürünür, kapıya varınca içeri girilir (tuş gerekmez)
+function rampH(x, z){ if(Math.abs(x-SHIP.x)>0.62) return 0; const t=(z-(SHIP.z-4.2))/2.8; if(t<=0||t>1.3) return 0; return Math.min(1,t)*1.15*(1-0.5*partK(0)); }
+function warp(fn){ if(S.warpT>0) return; S.warpT=0.22; S.warpFn=fn; $('fade').style.opacity=1; }
+function setInside(b){
+  S.inside=b; sun.intensity=b?0:0.92; hemi.intensity=b?0.4:0.62; hemi.color.setHex(b?0xa9bfdc:0xffe2c4); hemi.groundColor.setHex(b?0x3a4048:0xb0603a);
+  intL.a.intensity=b?0.85:0; intL.b.intensity=b?0.85:0; intL.c.intensity=b?0.7:0; intL.alarm.intensity=0; hand.visible=!b; motes.visible=!b;
+}
+function enterShip(){
+  setInside(true); S.px=INT.x; S.pz=INT.z+4.2; S.py=INT.y+EYE; S.vy=0; S.yaw=0; S.pitch=0; S.digging=false; S.click=false; sfx.door(); drawSys(); drawCom();
+  if(!S.visited){ S.visited=true; toast('Emergency power only. The cockpit is at the front. To leave, walk back out through the hatch.'); }
+}
+function exitShip(){ setInside(false); S.px=SPAWN.x; S.pz=SPAWN.z; S.py=hAt(S.px,S.pz)+EYE; S.vy=0; S.grounded=true; S.yaw=0; S.pitch=0; sfx.door(); }
+function updateInside(dt){
+  let f=0, s=0, vz=0; if(keys.KeyW||keys.ArrowUp) f+=1; if(keys.KeyS||keys.ArrowDown) f-=1; if(keys.KeyD) s+=1; if(keys.KeyA) s-=1;
+  if(keys.ArrowLeft) S.yaw+=1.9*dt; if(keys.ArrowRight) S.yaw-=1.9*dt;
+  if(f||s){ const l=1/Math.hypot(f,s), sy=Math.sin(S.yaw), cy=Math.cos(S.yaw), sp=(keys.ShiftLeft||keys.ShiftRight)?5:3.4;
+    vz=(-cy*f-sy*s)*l*sp; S.px+=(-sy*f+cy*s)*l*sp*dt; S.pz+=vz*dt; S.bob+=dt*sp*2.2; }
+  S.px=Math.max(INT.x-1.2,Math.min(INT.x+1.2,S.px)); S.pz=Math.max(INT.z-3.7,Math.min(INT.z+5.3,S.pz));
+  S.py=INT.y+EYE+Math.sin(S.bob)*0.02;
+  intL.alarm.intensity = S.parts[4]===2 ? 0 : 0.55+0.55*Math.sin(S.time*4);
+  if(S.pz>INT.z+5.1 && vz>0.4 && Math.abs(S.px-INT.x)<0.9) warp(exitShip);          // kapaktan yürüyerek çık
+}
+
+/* ============================== Havada süzülen toz ============================== */
+const MN=340, mP=new Float32Array(MN*3);
+for(let i=0;i<MN;i++){ mP[i*3]=SPAWN.x+(rand()-0.5)*44; mP[i*3+1]=rand()*9; mP[i*3+2]=SPAWN.z+(rand()-0.5)*44; }
+const mAttr=new THREE.BufferAttribute(mP,3); mAttr.setUsage(THREE.DynamicDrawUsage);
+const motes=(function(){ const g=new THREE.BufferGeometry(); g.setAttribute('position',mAttr); const m=new THREE.Points(g,new THREE.PointsMaterial({ size:0.075, color:0xffd9b0, transparent:true, opacity:0.5, depthWrite:false })); m.frustumCulled=false; scene.add(m); return m; })();
+function updateMotes(dt){
+  for(let i=0;i<MN;i++){ const a=i*3; mP[a]+=(1.3+(i%5)*0.25)*dt; mP[a+1]+=Math.sin(S.time*0.7+i)*0.06*dt; mP[a+2]+=(0.3+(i%3)*0.15)*dt;
+    if(mP[a]-S.px>22) mP[a]-=44; else if(mP[a]-S.px<-22) mP[a]+=44;
+    if(mP[a+2]-S.pz>22) mP[a+2]-=44; else if(mP[a+2]-S.pz<-22) mP[a+2]+=44;
+    if(mP[a+1]-S.py>6) mP[a+1]-=9; else if(mP[a+1]-S.py<-3) mP[a+1]+=9; }
+  mAttr.needsUpdate=true;
+}
+
+/* ============================== Hikâye: görev, haberleşme, parçalar ============================== */
+function installedCount(){ let n=0; for(let i=0;i<PARTS.length;i++) if(S.parts[i]===2) n++; return n; }
+function objective(){
+  if(S.launched) return T('Free play: finish off the mountain.');
+  if(!S.sentIds.mayday) return T('Walk up the ramp into your shuttle and contact Earth from the cockpit.');
+  for(let i=0;i<PARTS.length;i++){
+    if(S.parts[i]===0) return F('Sell dirt at Space Dust, then buy {0} at Dustfall Colony ({1} ₥).', T(PARTS[i].name), fmt(PARTS[i].price));
+    if(S.parts[i]===1) return F('Install {0} at the repair station inside your shuttle.', T(PARTS[i].name));
+  }
+  return T('All systems repaired. Launch from the cockpit comms console!');
+}
+function clock(t){ const m=Math.floor(t/60), s=Math.floor(t%60); return 'T+'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s; }
+function sendMsg(m){
+  if(S.sentIds[m.id]) return; S.sentIds[m.id]=1;
+  S.log.push({ who:'you', text:m.text, t:S.time }); S.pending.push({ id:m.id, reply:m.reply, sent:S.time, at:S.time+SIGNAL*2 });
+  sfx.send(); drawCom(); if(S.modal==='comms') renderTerm();
+}
+let pendEls=[];
+function updateComms(){
+  let got=false;
+  for(let i=S.pending.length-1;i>=0;i--) if(S.time>=S.pending[i].at){ const p=S.pending.splice(i,1)[0]; S.log.push({ who:'earth', text:p.reply, t:S.time }); S.gotIds[p.id]=1; S.unread++; got=true; }
+  if(got){ sfx.incoming(); drawCom(); if(S.modal==='comms'){ S.unread=0; drawCom(); renderTerm(); } else toast('Incoming transmission from Earth. Read it at the cockpit comms.'); }
+  if(S.modal==='comms') for(let i=0;i<pendEls.length;i++){ const q=pendEls[i], left=Math.max(0,q.p.at-S.time), tot=q.p.at-q.p.sent, out=S.time-q.p.sent<SIGNAL;
+    q.label.textContent=out?F('Your signal is crossing space to Earth... arrives in {0} s', Math.ceil(left)):F('Earth received it. The reply is on its way back... arrives in {0} s', Math.ceil(left)); q.bar.style.width=(100-left/tot*100).toFixed(1)+'%'; }
+}
+function el(tag, cls, html){ const e=document.createElement(tag); if(cls) e.className=cls; if(html!==undefined) e.innerHTML=html; return e; }
+function renderTerm(){
+  const Tt=$('termTitle'), U=$('termSub'), Bd=$('termBody'); Bd.innerHTML=''; pendEls=[];
+  if(S.modal==='comms'){
+    Tt.textContent=T('DEEP SPACE COMMS'); U.textContent=F('Earth is 12.5 light-minutes away. Nothing you send arrives instantly, and neither does the answer. (Time compressed: {0} s each way.)', SIGNAL);
+    if(!S.log.length) Bd.appendChild(el('div','msg','<small>'+T('SYSTEM')+'</small>'+T('No messages yet. The antenna still works. Earth should probably know you crashed.')));
+    S.log.forEach(function(m){ Bd.appendChild(el('div','msg'+(m.who==='you'?' you':''),'<small>'+(m.who==='you'?T('YOU  >>  EARTH CONTROL'):T('EARTH CONTROL  >>  YOU'))+'  ·  '+clock(m.t)+'</small>'+T(m.text))); });
+    S.pending.forEach(function(p){ const d=el('div','pend'), lab=el('div','',''), bar=el('div','bar','<i></i>'); d.appendChild(lab); d.appendChild(bar); Bd.appendChild(d); pendEls.push({ p:p, label:lab, bar:bar.firstElementChild }); });
+    const n=installedCount(); let any=false;
+    if(n>=PARTS.length && !S.launched) Bd.appendChild(button('LAUNCH','launch',function(){ launch(); }));
+    Bd.appendChild(el('h3','',T('Send a message')));
+    CONVO.forEach(function(m){ if(m.need<=n && !S.sentIds[m.id]){ any=true; Bd.appendChild(button(m.label,'',function(){ sendMsg(m); })); } });
+    SMALLTALK.forEach(function(m){ if(S.gotIds.mayday && !S.sentIds[m.id] && (!m.after || S.gotIds[m.after])){ any=true; Bd.appendChild(button(m.label,'ghost',function(){ sendMsg(m); })); } });
+    if(!any) Bd.appendChild(el('div','tsub',T('Nothing new to report. Repair something first.')));
+  } else if(S.modal==='depot'){
+    Tt.textContent=T('DUSTFALL PARTS DEPOT'); U.innerHTML='BOLT: "'+T(S.botLine)+'"<br>'+T('Your credits:')+' <span class="cash">'+fmt(S.money)+' ₥</span>';
+    PARTS.forEach(function(p,i){ const st=S.parts[i], locked=i>0 && S.parts[i-1]===0; let btn;
+      if(st===2) btn=button('Installed','',null,true); else if(st===1) btn=button('In cargo','',null,true);
+      else if(locked) btn=button('Locked','poor',function(){ S.botLine=pick(BOT.locked); sfx.bot(); bolt.talk=1; renderTerm(); });
+      else btn=button('Buy', S.money>=p.price?'':'poor', function(){ buyPart(i); });
+      Bd.appendChild(item((i+1)+'. '+T(p.name), p.desc, '<b>'+fmt(p.price)+' ₥</b>'+T('shuttle part'), btn)); });
+    Bd.appendChild(el('div','tsub',T('Bought parts go to your cargo. Install them at the repair station inside your shuttle.')));
+  } else if(S.modal==='repair'){
+    Tt.textContent=T('REPAIR STATION'); U.textContent=F('Parts are sold at Dustfall Colony, east of Space Dust (blue beacon). Installed: {0} / {1}', installedCount(), PARTS.length);
+    PARTS.forEach(function(p,i){ const st=S.parts[i]; let btn=null, price;
+      if(st===2){ btn=button('Installed','',null,true); price='<b>OK</b>'; }
+      else if(st===1){ price='<b>'+T('In cargo')+'</b>'; btn = S.installing===i ? button(F('Installing... {0}%', Math.floor(S.installT/2.6*100)),'ghost',function(){}) : button('Install','',function(){ installPart(i); }); }
+      else price='<b>'+T('Missing')+'</b>'+fmt(p.price)+' ₥';
+      Bd.appendChild(item(p.name, p.desc, price, btn)); });
+  } else if(S.modal==='log'){
+    Tt.textContent=T('FLIGHT LOG: COURIER 7'); U.textContent=T('Cargo: one (1) sealed package. Recipient: unknown.');
+    LOGS.forEach(function(l){ Bd.appendChild(el('div','msg',T(l))); });
+  } else if(S.modal==='end'){
+    Tt.textContent=T('LIFTOFF'); U.textContent='';
+    Bd.appendChild(el('div','msg','<small>'+T('COURIER 7 FLIGHT LOG')+'</small>'+T('The repaired shuttle shakes, coughs, and climbs out of the Martian dust. Below, next to a slightly smaller mountain, an old man in a helmet waves from a shop that Earth still insists is a vending machine.')));
+    Bd.appendChild(el('div','msg','<small>'+T('EARTH CONTROL  >>  YOU')+'</small>'+T('Welcome home, Courier 7. Your delivery is 219 days late. The recipient left a review: "Slow. Wrecked the parking lot. Good with a spoon. One star."')));
+    Bd.appendChild(el('div','tsub',F('Dirt sold: {0} kg  ·  Mountain removed: {1}%  ·  Mission time: {2}', fmt(S.soldKg), (S.removedVol/S.totalVol*100).toFixed(2), clock(S.time))));
+    Bd.appendChild(button('Turn around and keep digging (free play)','',function(){ closeShop(); }));
+  }
+}
+function openTerm(kind){
+  S.shopOpen=true; S.modal=kind; S.digging=false; S.click=false; for(const k in keys) keys[k]=false;
+  if(kind==='depot'){ S.botLine=pick(BOT.hello); sfx.bot(); bolt.talk=1.2; }
+  if(kind==='comms'){ S.unread=0; drawCom(); }
+  if(kind==='log') S.readLog=true;
+  $('term').classList.remove('hidden'); renderTerm();
+  if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+}
+function buyPart(i){
+  const p=PARTS[i];
+  if(S.parts[i]!==0) return;
+  if(i>0 && S.parts[i-1]===0){ S.botLine=pick(BOT.locked); sfx.bot(); bolt.talk=1; renderTerm(); return; }
+  if(S.money<p.price){ S.botLine=pick(BOT.poor); sfx.nope(); bolt.talk=1; renderTerm(); return; }
+  S.money-=p.price; S.parts[i]=1; S.botLine=pick(BOT.buy); sfx.buy(); bolt.talk=1; drawSys(); renderTerm();
+}
+function installPart(i){ if(S.installing>=0 || S.parts[i]!==1) return; S.installing=i; S.installT=0; renderTerm(); }
+let ratchetT=0;
+function updateInstall(dt){
+  if(S.installing<0) return;
+  S.installT+=dt; ratchetT-=dt; if(ratchetT<=0){ ratchetT=0.28; sfx.ratchet(); if(S.modal==='repair') renderTerm(); }
+  if(S.installT>=2.6){ const i=S.installing; S.parts[i]=2; S.installing=-1; applyShip(); drawSys(); sfx.buy(); toast(F('{0} installed! Report it to Earth from the cockpit.', T(PARTS[i].name))); if(S.modal==='repair') renderTerm(); }
+}
+function launch(){ S.launched=true; S.modal='end'; sfx.boom(); flash(); renderTerm(); }
+function nearDepot(){ return Math.hypot(S.px-(COLONY.x-2), S.pz-(COLONY.z+7.6)) < 4.2; }
+function interact(){
+  if(S.inside){ const st=nearStation(); if(!st) return;
+    if(st.id==='comms') openTerm('comms'); else if(st.id==='repair') openTerm('repair'); else if(st.id==='log') openTerm('log');
+    else if(st.id==='cryo') toast('Cryo pod: OUT OF ORDER. Like everything else on this ship.'); else toast('The coffee machine survived the crash. It is the only thing that did.');
+    return; }
+  if(nearShop()){ openShop(); return; }
+  if(S.mounted) return;
+  if(nearDepot()){ openTerm('depot'); return; }
+  const n=nearNpc(); if(n){ toast(F('Colonist: "{0}"', T(n.lines[n.i%n.lines.length]))); n.i++; sfx.amca(); }
+}
+
+/* ============================== Astronot gövdesi (gölge için) ============================== */
+const body = new THREE.Group();
+(function(){
+  const m=new THREE.MeshBasicMaterial({ colorWrite:false, depthWrite:false });
+  function part(geo,x,y,z,rx,rz){ const b=new THREE.Mesh(geo,m); b.position.set(x,y,z); if(rx) b.rotation.x=rx; if(rz) b.rotation.z=rz; b.castShadow=true; b.frustumCulled=false; body.add(b); }
+  part(new THREE.CylinderGeometry(0.12,0.13,0.82,8), -0.15,0.41,0);
+  part(new THREE.CylinderGeometry(0.12,0.13,0.82,8),  0.15,0.41,0);
+  part(new THREE.BoxGeometry(0.2,0.12,0.34), -0.15,0.06,-0.05); part(new THREE.BoxGeometry(0.2,0.12,0.34), 0.15,0.06,-0.05);
+  part(new THREE.BoxGeometry(0.56,0.66,0.36), 0,1.12,0);
+  part(new THREE.BoxGeometry(0.46,0.7,0.24), 0,1.18,0.29);                 // sırt ünitesi
+  part(new THREE.SphereGeometry(0.29,12,10), 0,1.68,0);                     // kask
+  part(new THREE.CylinderGeometry(0.09,0.085,0.62,8), -0.38,1.1,0, 0, -0.18);
+  part(new THREE.CylinderGeometry(0.09,0.085,0.66,8),  0.38,1.18,-0.24, 1.0, 0.1);
+  scene.add(body);
+})();
+
+/* ============================== Elde tutulan alet ============================== */
+const viewScene = new THREE.Scene();
+const viewCam = new THREE.PerspectiveCamera(55, 1, 0.01, 10);
+viewScene.add(new THREE.AmbientLight(0xffe6d0, 0.72));
+(function(){ const l=new THREE.DirectionalLight(0xffffff,0.75); l.position.set(1,1.4,0.8); viewScene.add(l); })();
+const hand = new THREE.Group(); viewScene.add(hand);
+const HAND_POS = new THREE.Vector3(0.36,-0.5,-0.78);
+let toolSpin = null;
+function vm(geo, color, o){ return new THREE.Mesh(geo, new THREE.MeshPhongMaterial(Object.assign({ color:color, shininess:40 }, o||{}))); }
+function buildTool(id){
+  const g=new THREE.Group(), STEEL=0xc9ced6, WOOD=0x9a6a3c, IRON=0x555b66, GLOVE=0x5c6066;
+  function sleeve(x, rz){
+    const a=new THREE.Group(); a.position.set(x,0,0); a.rotation.z=rz||0; g.add(a);
+    put(a, vm(new THREE.CylinderGeometry(0.075,0.095,0.56,12), 0xf2f2f0, {shininess:12}), 0,-0.33,0);   // astronot kolu
+    put(a, vm(new THREE.CylinderGeometry(0.082,0.082,0.035,12), 0xff7a2a, {shininess:20}), 0,-0.1,0);
+    put(a, vm(new THREE.CylinderGeometry(0.078,0.078,0.05,12), 0x8f959c, {shininess:90}), 0,-0.05,0);
+    put(a, vm(new THREE.SphereGeometry(0.078,12,10), GLOVE, {shininess:25}), 0,0.02,0).scale.set(1,1.15,1.05);
+    put(a, vm(new THREE.BoxGeometry(0.11,0.07,0.06), GLOVE, {shininess:25}), 0,0.06,-0.06);
+  }
+  toolSpin=null;
+  if(id==='hilti'){                                  // iki elle tutulan ağır kırıcı
+    sleeve(-0.27, -0.3); sleeve(0.27, 0.3);
+    put(g, vm(new THREE.CylinderGeometry(0.026,0.026,0.7,10), 0x1c1c1e), 0,0.03,0).rotation.z=Math.PI/2;      // tutma kolu
+    put(g, vm(new THREE.BoxGeometry(0.06,0.2,0.06), 0x1c1c1e), -0.1,0.12,0); put(g, vm(new THREE.BoxGeometry(0.06,0.2,0.06), 0x1c1c1e), 0.1,0.12,0);
+    put(g, vm(new THREE.BoxGeometry(0.27,0.52,0.25), 0xc8321e, {shininess:30}), 0,0.46,0);                    // gövde
+    put(g, vm(new THREE.BoxGeometry(0.28,0.09,0.26), 0x1c1c1e), 0,0.36,0);
+    put(g, vm(new THREE.CylinderGeometry(0.13,0.13,0.4,14), 0x2a2a2c), 0,0.5,0).rotation.z=Math.PI/2;          // motor
+    put(g, vm(new THREE.CylinderGeometry(0.075,0.12,0.24,12), 0x2a2a2c), 0,0.84,0);
+    const pg=new THREE.Group(); g.add(pg); g.userData.punch=pg;
+    put(pg, vm(new THREE.CylinderGeometry(0.045,0.045,0.5,8), STEEL, {shininess:120}), 0,1.18,0);
+    put(pg, vm(new THREE.BoxGeometry(0.13,0.2,0.04), STEEL, {shininess:120}), 0,1.5,0);
+  } else {
+    sleeve(0,0);
+    if(id==='kasik'){
+      put(g, vm(new THREE.CylinderGeometry(0.011,0.015,0.46,8), STEEL, {shininess:120}), 0,0.26,0);
+      put(g, vm(new THREE.SphereGeometry(0.07,12,8), STEEL, {shininess:120}), 0,0.55,0).scale.set(0.85,1.3,0.3);
+    } else if(id==='kepce'){
+      put(g, vm(new THREE.CylinderGeometry(0.013,0.016,0.62,8), STEEL, {shininess:120}), 0,0.33,0);
+      const b=put(g, vm(new THREE.SphereGeometry(0.11,14,8,0,Math.PI*2,Math.PI/2,Math.PI/2), STEEL, {shininess:120, side:THREE.DoubleSide}), 0,0.66,-0.1); b.rotation.x=-0.9;
+    } else if(id==='cekic'){
+      put(g, vm(new THREE.CylinderGeometry(0.022,0.026,0.6,8), WOOD), 0,0.3,0);
+      put(g, vm(new THREE.BoxGeometry(0.13,0.13,0.32), IRON, {shininess:80}), 0,0.62,-0.03);
+    } else if(id==='kurek'){
+      put(g, vm(new THREE.CylinderGeometry(0.02,0.022,0.8,8), WOOD), 0,0.4,0);
+      put(g, vm(new THREE.BoxGeometry(0.26,0.34,0.02), STEEL, {shininess:100}), 0,0.95,-0.02).rotation.x=-0.15;
+    } else if(id==='kazma'){
+      put(g, vm(new THREE.CylinderGeometry(0.022,0.026,0.8,8), WOOD), 0,0.4,0);
+      put(g, vm(new THREE.ConeGeometry(0.045,0.42,8), IRON, {shininess:80}), 0,0.8,-0.2).rotation.x=-Math.PI/2+0.25;
+      put(g, vm(new THREE.ConeGeometry(0.045,0.42,8), IRON, {shininess:80}), 0,0.8,0.2).rotation.x=Math.PI/2-0.25;
+      put(g, vm(new THREE.BoxGeometry(0.07,0.09,0.12), IRON), 0,0.82,0);
+    } else {                                           // matkap: kalın, tırtıklı burgu uç
+      put(g, vm(new THREE.CylinderGeometry(0.105,0.105,0.36,14), 0xff8a2a), 0,0.24,0);
+      put(g, vm(new THREE.BoxGeometry(0.11,0.11,0.22), 0x2e2e2e), 0,0.12,0.13);
+      put(g, vm(new THREE.CylinderGeometry(0.11,0.11,0.05,14), 0x2e2e2e), 0,0.3,0);
+      put(g, vm(new THREE.CylinderGeometry(0.085,0.11,0.1,12), 0x2e2e2e), 0,0.47,0);
+      const sp=new THREE.Group(); sp.position.set(0,0.52,0); g.add(sp); toolSpin=sp;
+      const n=6, sh=0.078;
+      for(let i=0;i<n;i++){ const rb=0.135*(1-i/(n+0.8)), rt=0.135*(1-(i+1)/(n+0.8))*0.6;
+        put(sp, vm(new THREE.CylinderGeometry(rt,rb,sh,10), i%2?0xaab1bb:STEEL, {shininess:140, flatShading:true}), 0,sh/2+i*sh,0);
+        put(sp, vm(new THREE.BoxGeometry(rb*2.1,0.018,0.035), 0x7d848e), 0,0.01+i*sh,0).rotation.y=i*0.8; }
+      put(sp, vm(new THREE.ConeGeometry(0.02,0.07,6), STEEL, {shininess:140}), 0,n*sh+0.03,0);
+    }
+  }
+  g.userData.clump = put(g, vm(new THREE.DodecahedronGeometry(TIP[id][1],0), 0xb4602e, {shininess:4, flatShading:true}), 0,TIP[id][0],-0.02);
+  g.userData.clump.visible=false;
+  return g;
+}
+let toolMesh=null;
+function equip(i){
+  S.tool=i; S.swingT=-1; S.click=false; S.clump=0; if(toolMesh) hand.remove(toolMesh);
+  toolMesh=buildTool(TOOLS[i].id); hand.add(toolMesh);
+  renderToolbar();
+}
+
+/* ============================== Toz parçacıkları ============================== */
+const PMAX=260, pPos=new Float32Array(PMAX*3), pVel=new Float32Array(PMAX*3), pLife=new Float32Array(PMAX); let pNext=0;
+for(let i=0;i<PMAX;i++) pPos[i*3+1]=-999;
+const pGeo=new THREE.BufferGeometry(); const pAttr=new THREE.BufferAttribute(pPos,3); pAttr.setUsage(THREE.DynamicDrawUsage); pGeo.setAttribute('position',pAttr);
+const dustTex = textTexture(64,64,function(g){ const gr=g.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.5,'rgba(255,255,255,0.6)'); gr.addColorStop(1,'rgba(255,255,255,0)'); g.fillStyle=gr; g.fillRect(0,0,64,64); });
+const dust=new THREE.Points(pGeo,new THREE.PointsMaterial({ size:0.6, map:dustTex, color:0xdc9560, transparent:true, opacity:0.6, depthWrite:false }));
+dust.frustumCulled=false; scene.add(dust);
+function spawnDust(x,y,z,r,count){
+  for(let n=0;n<count;n++){ const i=pNext; pNext=(pNext+1)%PMAX; const a=Math.random()*6.283, rr=Math.random()*r*0.6;
+    pPos[i*3]=x+Math.cos(a)*rr; pPos[i*3+1]=y+0.1; pPos[i*3+2]=z+Math.sin(a)*rr;
+    const sp=0.6+Math.random()*1.6; pVel[i*3]=Math.cos(a)*sp; pVel[i*3+1]=1.4+Math.random()*2.4; pVel[i*3+2]=Math.sin(a)*sp; pLife[i]=0.7+Math.random()*0.7; }
+}
+function updateDust(dt){
+  for(let i=0;i<PMAX;i++){ if(pLife[i]<=0) continue; pLife[i]-=dt;
+    if(pLife[i]<=0){ pPos[i*3+1]=-999; continue; }
+    pVel[i*3+1]-=3.7*dt; pPos[i*3]+=pVel[i*3]*dt; pPos[i*3+1]+=pVel[i*3+1]*dt; pPos[i*3+2]+=pVel[i*3+2]*dt; }
+  pAttr.needsUpdate=true;
+}
+
+/* ============================== Saçılan toprak ve taşlar ============================== */
+const DMAX=220, dP=new Float32Array(DMAX*3), dV=new Float32Array(DMAX*3), dR=new Float32Array(DMAX*3), dS=new Float32Array(DMAX), dL=new Float32Array(DMAX), dRest=new Uint8Array(DMAX); let dNext=0;
+const debris=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0), new THREE.MeshLambertMaterial({ color:0xffffff, flatShading:true }), DMAX);
+const dObj=new THREE.Object3D(), dCol=new THREE.Color();
+(function(){ dObj.scale.set(0,0,0); dObj.updateMatrix(); for(let i=0;i<DMAX;i++){ debris.setMatrixAt(i,dObj.matrix); debris.setColorAt(i,dCol.setRGB(0.7,0.38,0.22)); } })();
+debris.castShadow=true; debris.receiveShadow=true; debris.frustumCulled=false; scene.add(debris);
+function spawnDebris(x,y,z,tx,tz,count,big){
+  for(let n=0;n<count;n++){ const i=dNext; dNext=(dNext+1)%DMAX;
+    dP[i*3]=x+(Math.random()-0.5)*0.5; dP[i*3+1]=y+0.08+Math.random()*0.15; dP[i*3+2]=z+(Math.random()-0.5)*0.5;
+    const sp=0.5+Math.random()*2.2;
+    dV[i*3]=tx*sp+(Math.random()-0.5)*2.2; dV[i*3+1]=1.4+Math.random()*3.0; dV[i*3+2]=tz*sp+(Math.random()-0.5)*2.2;
+    dR[i*3]=Math.random()*6; dR[i*3+1]=Math.random()*6; dR[i*3+2]=Math.random()*6;
+    dS[i]=big ? 0.10+Math.random()*0.26 : 0.03+Math.random()*0.085; dL[i]=5+Math.random()*4; dRest[i]=0;
+    if(Math.random()<0.3) dCol.setRGB(0.52+Math.random()*0.1,0.44,0.40); else dCol.setRGB(0.66+Math.random()*0.14,0.36+Math.random()*0.05,0.20);
+    debris.setColorAt(i,dCol); }
+  debris.instanceColor.needsUpdate=true;
+}
+function updateDebris(dt){
+  for(let i=0;i<DMAX;i++){ if(dL[i]<=0) continue; dL[i]-=dt; const a=i*3;
+    if(!dRest[i]){
+      dV[a+1]-=GRAV*dt; dP[a]+=dV[a]*dt; dP[a+1]+=dV[a+1]*dt; dP[a+2]+=dV[a+2]*dt; dR[a]+=dt*5; dR[a+2]+=dt*3.5;
+      const gy=hAt(dP[a],dP[a+2])+dS[i]*0.45;
+      if(dP[a+1]<gy){ dP[a+1]=gy; if(dV[a+1]<-1.1){ dV[a+1]*=-0.28; dV[a]*=0.55; dV[a+2]*=0.55; } else dRest[i]=1; }
+    } else { const gy=hAt(dP[a],dP[a+2])+dS[i]*0.45; if(dP[a+1]>gy+0.05) dRest[i]=0; else dP[a+1]=gy; }
+    const k=dL[i]<=0?0:Math.min(1,dL[i]/0.6);
+    dObj.position.set(dP[a],dP[a+1],dP[a+2]); dObj.rotation.set(dR[a],dR[a+1],dR[a+2]); dObj.scale.setScalar(dS[i]*k); dObj.updateMatrix(); debris.setMatrixAt(i,dObj.matrix); }
+  debris.instanceMatrix.needsUpdate=true;
+}
+
+/* ============================== Ses ============================== */
+let actx=null;
+function audio(){ if(S.muted) return null; if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx && actx.state==='suspended'){ try{ actx.resume(); }catch(e){} } return actx; }
+function sNoise(dur, freq, vol){ const a=audio(); if(!a) return; try{
+  const len=Math.max(1,Math.floor(a.sampleRate*dur)), buf=a.createBuffer(1,len,a.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2);
+  const s=a.createBufferSource(); s.buffer=buf; const f=a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=freq; const g=a.createGain(); g.gain.value=vol;
+  s.connect(f); f.connect(g); g.connect(a.destination); s.start(); }catch(e){} }
+function sTone(freq, dur, type, vol, delay, slide){ const a=audio(); if(!a) return; try{
+  const t=a.currentTime+(delay||0), o=a.createOscillator(), g=a.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(20,freq*slide), t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+0.02); }catch(e){} }
+const sfx = {
+  dig(i){ sNoise(0.16+i*0.02, 900-i*90, 0.32); sTone(120-i*8, 0.08, 'sine', 0.18, 0, 0.5); },
+  drill(){ sNoise(0.09, 2400, 0.14); sTone(210+Math.random()*30, 0.07, 'sawtooth', 0.05); },
+  machine(){ sNoise(0.14, 500, 0.3); sTone(62, 0.12, 'sawtooth', 0.08); },
+  hilti(){ sNoise(0.07, 1300, 0.34); sTone(72, 0.06, 'square', 0.13); },
+  borer(){ sNoise(0.13, 700, 0.3); sTone(46+Math.random()*6, 0.11, 'sawtooth', 0.1); },
+  scoop(){ sNoise(0.6, 420, 0.55); sTone(58, 0.45, 'sawtooth', 0.12, 0, 0.55); },
+  boom(){ sNoise(1.5, 320, 0.95); sTone(64, 1.1, 'sine', 0.5, 0, 0.3); },
+  rumble(){ sNoise(0.32, 230, 0.33); },
+  alarm(){ sTone(880, 0.12, 'square', 0.045); },
+  spark(){ sTone(1700+Math.random()*1600, 0.04, 'square', 0.03); },
+  door(){ sNoise(0.35, 900, 0.25); sTone(180, 0.3, 'sine', 0.1, 0, 0.5); },
+  send(){ sTone(660,0.08,'sine',0.1); sTone(880,0.08,'sine',0.1,0.09); sTone(1320,0.16,'sine',0.1,0.18); },
+  incoming(){ sTone(1320,0.1,'sine',0.12); sTone(990,0.1,'sine',0.12,0.14); sTone(1320,0.1,'sine',0.12,0.28); sTone(990,0.2,'sine',0.12,0.42); },
+  bot(){ for(let i=0;i<5;i++) sTone(300+Math.floor(Math.random()*5)*110, 0.06, 'square', 0.04, i*0.08); },
+  ratchet(){ sNoise(0.05, 2600, 0.2); sTone(420, 0.04, 'square', 0.05); },
+  clank(){ sTone(900, 0.07, 'square', 0.05, 0, 0.6); },
+  swish(){ sNoise(0.1, 3000, 0.04); },
+  full(){ sTone(160, 0.14, 'square', 0.05); },
+  sell(){ sTone(988,0.09,'square',0.06); sTone(1319,0.25,'square',0.06,0.09); },
+  buy(){ sTone(523,0.08,'triangle',0.12); sTone(659,0.08,'triangle',0.12,0.08); sTone(784,0.2,'triangle',0.12,0.16); },
+  nope(){ sTone(180,0.12,'sawtooth',0.06); sTone(140,0.2,'sawtooth',0.06,0.12); },
+  amca(){ const n=5+Math.floor(Math.random()*4); for(let i=0;i<n;i++) sTone(105+Math.random()*70, 0.07, 'square', 0.045, i*0.085, 0.85+Math.random()*0.3); }
+};
+
+/* ============================== Arayüz ============================== */
+const ui = { money:$('money'), bag:$('bag'), bagBar:$('bagBar'), bagLabel:$('bagLabel'), toolName:$('toolName'), pct:$('pct'), pctBar:$('pctBar'), prompt:$('prompt'), toast:$('toast'), toolbar:$('toolbar') };
+const last = {};
+function setText(el, key, v){ if(last[key]!==v){ last[key]=v; el.textContent=v; } }
+function capacity(){ return S.mounted ? S.mounted.def.cap : BAGS[S.bag].cap; }
+let toastT=0, toastKey='';
+function toast(msg, warn, key){
+  if(key && key===toastKey && toastT>0.4) return;
+  msg=T(msg); toastKey=key||''; ui.toast.textContent=msg; ui.toast.className='panel show'+(warn?' warn':''); toastT=Math.max(2.6, msg.length*0.06);
+}
+function renderToolbar(){
+  ui.toolbar.innerHTML='';
+  TOOLS.forEach(function(t,i){ if(!S.owned[i]) return; const d=document.createElement('div'); d.className='slot'+(i===S.tool&&!S.mounted?' on':''); d.innerHTML='<small>'+(i+1)+'</small>'+T(t.name); ui.toolbar.appendChild(d); });
+  VEHS.forEach(function(v){ if(!v.owned) return; const d=document.createElement('div'); d.className='slot'+(S.mounted===v?' on':''); d.innerHTML='<small>F</small>'+T(v.def.name); ui.toolbar.appendChild(d); });
+}
+function updateHud(){
+  setText(ui.money,'money',fmt(S.money)+' ₥');
+  const cap=capacity();
+  setText(ui.bag,'bag',fmt(S.soil)+' / '+fmt(cap)+' kg');
+  setText(ui.bagLabel,'bl',S.mounted?F('{0} hopper',T(S.mounted.def.name)):T(BAG_NAMES[S.bag]));
+  const f=Math.min(1,S.soil/cap), w=(f*100).toFixed(1)+'%';
+  if(last.bw!==w){ last.bw=w; ui.bagBar.firstElementChild.style.width=w; ui.bagBar.className='bar'+(f>=0.999?' full':''); }
+  setText(ui.toolName,'tool',T(S.mounted?S.mounted.def.name:TOOLS[S.tool].name));
+  const p=Math.min(100,S.removedVol/S.totalVol*100);
+  setText(ui.pct,'pct',p.toFixed(3)+'%');
+  const pw=p.toFixed(2)+'%'; if(last.pw!==pw){ last.pw=pw; ui.pctBar.style.width=pw; }
+  setText($('obj'),'obj',objective());
+  const ml=S.unread>0; if(last.ml!==ml){ last.ml=ml; $('mail').classList.toggle('hidden',!ml); }
+}
+function rate(t){ return t.kg/0.083; }
+function showQuote(raw){ S.quoteRaw=raw; $('quote').textContent=T(raw); sfx.amca(); amcaTalk=1.2; }
+function say(kind){
+  if(kind==='hello' && S.readLog && !S.toldPkg){ S.toldPkg=true; showQuote(QUOTES.pkg[0]); return; }
+  showQuote(pick(QUOTES[kind]));
+}
+let amcaTalk=0;
+function item(title, sub, priceHtml, btn){
+  const d=document.createElement('div'); d.className='item';
+  const t=document.createElement('div'); t.className='t'; const b=document.createElement('b'); b.textContent=T(title); const s=document.createElement('span'); s.textContent=T(sub); t.appendChild(b); t.appendChild(s);
+  const p=document.createElement('div'); p.className='p'; p.innerHTML=priceHtml;
+  d.appendChild(t); d.appendChild(p); if(btn) d.appendChild(btn); return d;
+}
+function button(label, cls, fn, disabled){ const b=document.createElement('button'); b.className='btn '+(cls||''); b.textContent=T(label); if(disabled) b.disabled=true; else b.onclick=fn; return b; }
+function tryBuy(price, ok){
+  if(S.money<price){ say('poor'); sfx.nope(); return; }
+  S.money-=price; ok(); sfx.buy(); renderShop();
+}
+function renderShop(){
+  $('shopMoney').textContent=fmt(S.money)+' ₥';
+  const kg=Math.round(S.soil);
+  $('sellBtn').textContent = kg>0 ? F('Sell dirt: {0} kg → {1} ₥', fmt(kg), fmt(kg*PRICE)) : T('No dirt to sell');
+  const tl=$('toolList'); tl.innerHTML='';
+  TOOLS.forEach(function(t,i){
+    let btn;
+    if(S.owned[i]) btn = (i===S.tool) ? button('Equipped','',null,true) : button('Equip','ghost',function(){ equip(i); renderShop(); });
+    else btn = button('Buy', S.money>=t.price?'':'poor', function(){ tryBuy(t.price,function(){ S.owned[i]=true; equip(i); say('buy'); }); });
+    tl.appendChild(item(t.name, t.desc, '<b>'+(t.price?fmt(t.price)+' ₥':T('Free'))+'</b>'+(t.hold?'~'+fmt(rate(t))+' '+T('kg/s'):t.kg+' '+T('kg/hit')), btn));
+  });
+  const bb=$('bagBox'); bb.innerHTML='';
+  if(S.bag<BAGS.length-1){ const nx=BAGS[S.bag+1];
+    bb.appendChild(item(BAG_NAMES[S.bag+1], fmt(BAGS[S.bag].cap)+' kg → '+fmt(nx.cap)+' kg', '<b>'+fmt(nx.price)+' ₥</b>'+T('capacity'), button('Upgrade', S.money>=nx.price?'':'poor', function(){ tryBuy(nx.price,function(){ S.bag++; say('buy'); }); })));
+  } else bb.appendChild(item(BAG_NAMES[S.bag], F('{0} kg, the biggest there is', fmt(BAGS[S.bag].cap)), '<b>MAX</b>', null));
+  const mb=$('machBox'); mb.innerHTML='';
+  VEHS.forEach(function(v){ const d=v.def;
+    if(!v.owned) mb.appendChild(item(d.name, T(d.desc)+' '+F('Hopper: {0} kg', fmt(d.cap)), '<b>'+fmt(d.price)+' ₥</b>'+(d.hold?'~'+fmt(rate(d))+' '+T('kg/s'):fmt(d.kg)+' '+T('kg/scoop')), button('Buy', S.money>=d.price?'':'poor', function(){ tryBuy(d.price,function(){ placeVehicle(v); renderToolbar(); showQuote(pick(QUOTES.machine)); }); })));
+    else mb.appendChild(item(d.name, T('Parked next to the shop. Walk up to it and press F.'), '<b>'+T('Owned')+'</b>', null));
+  });
+}
+function openShop(){
+  S.shopOpen=true; S.modal='shop'; S.digging=false; S.click=false; for(const k in keys) keys[k]=false;
+  $('shop').classList.remove('hidden'); renderShop(); say('hello');
+  if(document.exitPointerLock && document.pointerLockElement) document.exitPointerLock();
+}
+function closeShop(){ S.shopOpen=false; S.modal=''; $('shop').classList.add('hidden'); $('term').classList.add('hidden'); requestLock(); if(S.noLock) refreshOverlay(); else setTimeout(refreshOverlay,200); }
+$('shopClose').onclick=closeShop; $('termClose').onclick=closeShop;
+$('term').addEventListener('mousedown',function(e){ if(e.target===$('term')) closeShop(); });
+(function(){ const pv=document.querySelector('.head svg'); if(pv) pv.onclick=function(){ showQuote(pick(QUOTES.hello)); }; })();
+function showStory(key){ const el=$('story'); S.storyKey=key; el.innerHTML=T(key); el.classList.remove('hidden'); S.storyT=13; }
+$('shop').addEventListener('mousedown',function(e){ if(e.target===$('shop')) closeShop(); });
+$('sellBtn').onclick=function(){
+  const kg=Math.round(S.soil);
+  if(kg<=0){ say('empty'); sfx.nope(); return; }
+  S.money+=kg*PRICE; S.soldKg+=kg; S.soil=0; say('sell'); sfx.sell(); renderShop();
+};
+
+/* ============================== Girdi ============================== */
+function requestLock(){
+  if(S.noLock) return;
+  try{ const p=canvas.requestPointerLock(); if(p && typeof p.catch==='function') p.catch(lockFail); }catch(e){ lockFail(); }
+}
+function lockFail(){ if(!S.everLocked) S.noLock=true; refreshOverlay(); }
+function isActive(){ return S.started && !S.shopOpen && (S.locked || S.noLock); }
+function refreshStart(){ $('startSub').textContent=S.started?T('Paused'):T('One mountain. One spoon. Infinite patience.'); $('startGo').textContent=!S.ready?T('Loading...'):(S.started?T('Click to resume'):T('Click to start')); }
+function refreshOverlay(){
+  const show = !S.shopOpen && !isActive();
+  $('start').classList.toggle('hidden', !show);
+  refreshStart();
+}
+document.addEventListener('pointerlockchange',function(){ S.locked = document.pointerLockElement===canvas; if(S.locked) S.everLocked=true; else S.digging=false; refreshOverlay(); });
+document.addEventListener('pointerlockerror',lockFail);
+$('start').addEventListener('click',function(){
+  if(!S.started){ S.started=true; beginIntro(); }
+  audio(); requestLock(); refreshOverlay();
+});
+document.addEventListener('mousemove',function(e){
+  if(!isActive() || S.intro<3) return;
+  const mx=e.movementX||0, my=e.movementY||0; if(Math.abs(mx)>400||Math.abs(my)>400) return;
+  S.yaw-=mx*0.0022; S.pitch-=my*0.0022; S.pitch=Math.max(-1.5,Math.min(1.5,S.pitch));
+});
+canvas.addEventListener('mousedown',function(e){ if(e.button===0 && isActive() && S.intro>=3 && !S.inside){ S.digging=true; S.click=true; } });
+document.addEventListener('mouseup',function(e){ if(e.button===0) S.digging=false; });
+document.addEventListener('contextmenu',function(e){ e.preventDefault(); });
+window.addEventListener('blur',function(){ for(const k in keys) keys[k]=false; S.digging=false; });
+function nearShop(){ return Math.hypot(S.px-SHOP.x, S.pz-SHOP.z) < (S.mounted?12:8.5); }
+function nearVehicle(){ if(S.mounted) return null; let best=null, bd=6; VEHS.forEach(function(v){ if(!v.owned) return; const d=Math.hypot(S.px-v.x,S.pz-v.z); if(d<bd){ bd=d; best=v; } }); return best; }
+function cycleTool(dir){ let i=S.tool; for(let n=0;n<TOOLS.length;n++){ i=(i+dir+TOOLS.length)%TOOLS.length; if(S.owned[i]){ equip(i); return; } } }
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'||e.code.indexOf('Arrow')===0) e.preventDefault();
+  if(e.repeat){ return; }
+  if(S.shopOpen){ if(e.code==='KeyE'||e.code==='Escape') closeShop(); return; }
+  if(!isActive()) return;
+  if(S.intro<3){ if(e.code==='Enter' && S.intro===1) landNow(); return; }
+  keys[e.code]=true;
+  if(e.code==='KeyE') interact();
+  else if(e.code==='KeyF' && !S.inside){ if(S.mounted) dismount(); else { const v=nearVehicle(); if(v) mount(v); } }
+  else if(e.code==='KeyQ' && !S.mounted) cycleTool(1);
+  else if(e.code==='KeyR' && !S.mounted && !S.inside){ S.px=SHOP.x-7; S.pz=SHOP.z-7; S.py=hAt(S.px,S.pz)+EYE; S.vy=0; S.grounded=true; toast('Back at Space Dust.'); }
+  else if(e.code==='KeyL'){ setLang(LANG==='tr'?'en':'tr'); toast(LANG==='tr'?'Dil: Türkçe':'Language: English'); }
+  else if(e.code==='KeyV' && S.mounted){ S.chase=!S.chase; }
+  else if(e.code==='KeyM'){ S.muted=!S.muted; toast(S.muted?T('Sound off'):T('Sound on')); }
+  else if(e.code.indexOf('Digit')===0 && !S.mounted){ const i=parseInt(e.code.slice(5),10)-1; if(i>=0&&i<TOOLS.length&&S.owned[i]) equip(i); }
+});
+document.addEventListener('keyup',function(e){ keys[e.code]=false; });
+canvas.addEventListener('wheel',function(e){ if(isActive()&&!S.mounted) cycleTool(e.deltaY>0?1:-1); },{passive:true});
+
+function mount(v){ S.mounted=v; S.px=v.x; S.pz=v.z; S.yaw=v.yaw; S.pitch=-0.25; S.click=false; hand.visible=false; renderToolbar(); toast(v.def.hold?T('WASD to drive, hold click to bore. F: get out. V: camera.'):T('WASD to drive, click for one big scoop. F: get out. V: camera.')); }
+function dismount(){
+  const v=S.mounted; if(!v) return;
+  S.mounted=null; hand.visible=true; v.speed=0; v.swingT=-1;
+  S.px=v.x+Math.cos(v.yaw)*3.4; S.pz=v.z-Math.sin(v.yaw)*3.4; S.py=hAt(S.px,S.pz)+EYE; S.vy=0; S.grounded=true; renderToolbar();
+}
+
+/* ============================== Oyun döngüsü ============================== */
+function clampWorld(o, kx, kz){
+  const dx=o[kx]-W.CX, dz=o[kz]-W.CZ, d=Math.hypot(dx,dz);
+  if(d>W.R){ o[kx]=W.CX+dx/d*W.R; o[kz]=W.CZ+dz/d*W.R; toast('An invisible force stops you... You cannot go any further.', true, 'edge'); }
+}
+function pushOut(o, kx, kz, cx, cz, r){ const dx=o[kx]-cx, dz=o[kz]-cz, d=Math.hypot(dx,dz); if(d<r && d>0.0001){ o[kx]=cx+dx/d*r; o[kz]=cz+dz/d*r; } }
+
+function updatePlayer(dt){
+  let f=0, s=0; S.mvz=0;
+  if(keys.KeyW||keys.ArrowUp) f+=1; if(keys.KeyS||keys.ArrowDown) f-=1; if(keys.KeyD) s+=1; if(keys.KeyA) s-=1;
+  if(keys.ArrowLeft) S.yaw+=1.9*dt; if(keys.ArrowRight) S.yaw-=1.9*dt;
+  const moving = f!==0||s!==0;
+  if(moving){
+    const l=1/Math.hypot(f,s); f*=l; s*=l;
+    let sp=(keys.ShiftLeft||keys.ShiftRight)?10.5:6.2; if(TOOLS[S.tool].heavy) sp*=0.72;
+    const sy=Math.sin(S.yaw), cy=Math.cos(S.yaw);
+    const dx=(-sy*f+cy*s), dz=(-cy*f-sy*s);
+    const feetY=S.py-EYE;
+    if(S.grounded){ const h0=hAt(S.px,S.pz), h1=hAt(S.px+dx*0.6,S.pz+dz*0.6), slope=(h1-h0)/0.6; if(slope>2.3) sp=0; else if(slope>1.15) sp*=0.45; }
+    else if(hAt(S.px+dx*0.5,S.pz+dz*0.5)>feetY+0.3) sp=0;
+    S.px+=dx*sp*dt; S.pz+=dz*sp*dt; S.bob+=dt*sp*1.5; S.mvz=dz*sp;
+  }
+  pushOut(S,'px','pz',SHOP.x,SHOP.z,4.3);
+  for(let i=0;i<VEHS.length;i++) if(VEHS[i].owned) pushOut(S,'px','pz',VEHS[i].x,VEHS[i].z,2.8);
+  pushOut(S,'px','pz',SHIP.x-3.1,SHIP.z,2.9); pushOut(S,'px','pz',SHIP.x+2.9,SHIP.z,2.9);
+  for(let i=0;i<COL_OBS.length;i++) pushOut(S,'px','pz',COLONY.x+COL_OBS[i][0],COLONY.z+COL_OBS[i][1],COL_OBS[i][2]);
+  clampWorld(S,'px','pz');
+  if(S.intro>=5 && S.mvz>0.4 && Math.abs(S.px-SHIP.x)<0.8 && S.pz>SHIP.z-2.5 && S.pz<SHIP.z-1.0) warp(enterShip);   // rampadan yürüyerek gir
+  const gy=hAt(S.px,S.pz)+EYE+rampH(S.px,S.pz);
+  if(S.grounded){
+    if(keys.Space){ S.vy=JUMP; S.grounded=false; }
+    else if(S.py-gy>0.9){ S.grounded=false; S.vy=0; }
+    else S.py+=(gy-S.py)*Math.min(1,dt*16);
+  }
+  if(!S.grounded){ S.vy-=GRAV*dt; S.py+=S.vy*dt; if(S.py<=gy){ S.py=gy; S.vy=0; S.grounded=true; } }
+}
+function updateVehicle(v, dt){
+  const on = S.mounted===v, d=v.def; let f=0, t=0;
+  if(on){ if(keys.KeyW||keys.ArrowUp) f+=1; if(keys.KeyS||keys.ArrowDown) f-=1; if(keys.KeyA||keys.ArrowLeft) t+=1; if(keys.KeyD||keys.ArrowRight) t-=1; }
+  const target = f>0?d.speed:(f<0?-d.speed*0.55:0);
+  v.speed+=(target-v.speed)*Math.min(1,dt*3);
+  const dy=t*1.25*dt*(v.speed<-0.5?-1:1); v.yaw+=dy; if(on) S.yaw+=dy;
+  const sy=Math.sin(v.yaw), cy=Math.cos(v.yaw);
+  // dik kazı duvarına tırmanamaz
+  const nx=v.x-sy*v.speed*dt, nz=v.z-cy*v.speed*dt, sg=v.speed>=0?1:-1;
+  if(Math.abs(v.speed)<0.01 || hAt(nx-sy*3*sg, nz-cy*3*sg)-hAt(v.x,v.z) < 3.2){ v.x=nx; v.z=nz; } else v.speed=0;
+  pushOut(v,'x','z',SHOP.x,SHOP.z,6.6); pushOut(v,'x','z',SHIP.x,SHIP.z,7.5); for(let i=0;i<COL_OBS.length;i++) pushOut(v,'x','z',COLONY.x+COL_OBS[i][0],COLONY.z+COL_OBS[i][1],COL_OBS[i][2]+2.4); clampWorld(v,'x','z');
+  // paletlerin dört köşesinden zemine oturt
+  const hfl=hAt(v.x-sy*2.3-cy*1.4,v.z-cy*2.3+sy*1.4), hfr=hAt(v.x-sy*2.3+cy*1.4,v.z-cy*2.3-sy*1.4), hbl=hAt(v.x+sy*2.3-cy*1.4,v.z+cy*2.3+sy*1.4), hbr=hAt(v.x+sy*2.3+cy*1.4,v.z+cy*2.3-sy*1.4);
+  const hf=(hfl+hfr)/2, hb=(hbl+hbr)/2, hr=(hfr+hbr)/2, hl=(hfl+hbl)/2;
+  const k=Math.min(1,dt*5);
+  v.pitch+=(Math.max(-0.55,Math.min(0.55,Math.atan2(hf-hb,4.6)))-v.pitch)*k; v.roll+=(Math.max(-0.45,Math.min(0.45,Math.atan2(hr-hl,2.8)))-v.roll)*k;
+  const ty=Math.max((hf+hb)/2, hAt(v.x,v.z)-0.05);
+  if(v.y===undefined || dt===0) v.y=ty; else v.y+=(ty-v.y)*Math.min(1,dt*10);
+  const y=v.y;
+  v.dig=Math.max(0,v.dig-dt*3);
+  const jit = d.hold ? v.dig*0.02 : 0;
+  v.root.position.set(v.x+(Math.random()-0.5)*jit, y+(Math.random()-0.5)*jit, v.z); v.root.rotation.order='YXZ'; v.root.rotation.set(v.pitch,v.yaw,v.roll);
+  if(v.spin) v.spin.rotation.y+=dt*(1.5+v.dig*24);
+  else { const sw=v.swingT>=0?Math.sin(v.swingT*Math.PI):0; v.arm.rotation.x=0.42-sw*0.5; if(v.stick) v.stick.rotation.x=-1.25-sw*0.55; if(v.bucket) v.bucket.rotation.x=sw*0.9; }
+  if(on){ const e=d.eyePos, cr=Math.cos(v.roll), sr=Math.sin(v.roll), cp=Math.cos(v.pitch), sp2=Math.sin(v.pitch);
+    const x1=e[0]*cr-e[1]*sr, y1=e[0]*sr+e[1]*cr, y2=y1*cp-e[2]*sp2, z2=y1*sp2+e[2]*cp;
+    S.px=v.x+x1*cy+z2*sy; S.pz=v.z-x1*sy+z2*cy; S.py=y+y2; }
+}
+function doDig(){
+  const mt=S.mounted, tool=mt?mt.def:TOOLS[S.tool];
+  const cp=Math.cos(S.pitch), dx=-Math.sin(S.yaw)*cp, dy=Math.sin(S.pitch), dz=-Math.cos(S.yaw)*cp;
+  if(mt) mt.dig=1; if(tool.hold) S.swing=1;
+  const hit=rayTerrain(S.px,S.py,S.pz,dx,dy,dz,tool.reach);
+  if(!hit){ sfx.swish(); return; }
+  const cap=capacity()-S.soil;
+  if(cap<=0.01){ toast(mt?T('Hopper full! Drive to Space Dust and sell.'):T('Bag full! Go sell your dirt at Space Dust.'), true, 'full'); sfx.full(); return; }
+  // Aşağı doğru çukur kazılamaz: sadece ayak seviyesine kadar, ileriye doğru kazılır
+  const feet = mt ? mt.y : hAt(S.px,S.pz);
+  const kg=digAt(hit.x,hit.z,tool.r,Math.min(tool.kg,cap),S.px,S.pz,feet, mt?3:1.2, mt?7:3.2);
+  if(kg>0.001){
+    S.soil+=kg; S.clump=1; S.kick=mt&&!tool.hold?3:(tool.heavy?1.7:1);
+    const hl=Math.hypot(dx,dz)||1, tx=-dx/hl, tz=-dz/hl, gy=Math.max(hit.y,hAt(hit.x,hit.z));
+    spawnDust(hit.x,gy,hit.z,tool.r, mt?(tool.hold?10:40):(tool.hold?3:5+S.tool*2));
+    spawnDebris(hit.x,gy,hit.z,tx,tz, mt?(tool.hold?6:45):(tool.hold?(tool.heavy?5:3):6+S.tool*2), !!mt);
+    if(mt){ if(tool.hold) sfx.borer(); else sfx.scoop(); } else if(tool.heavy) sfx.hilti(); else if(tool.hold) sfx.drill(); else sfx.dig(S.tool);
+  } else { sfx.clank(); toast("Too hard to dig here. Only the mountain can be dug, down to shop level.", false, 'hard'); }
+}
+
+/* ============================== Açılış hikâyesi ============================== */
+const SUBS=[[0.4,'Mars orbit. Day 214 of a "three-day" delivery run.'],[3.2,'MASTER ALARM: ...everything, apparently.'],[5.6,'Engine 2 has left the chat.'],[7.7,'Brace for landing. Or whatever this is.']];
+let subNow='';
+function setSub(t){ S.subRaw=t; const v=T(t); if(v!==subNow){ subNow=v; $('sub').textContent=v; } }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function flash(){ const f=$('flash'); f.style.transition='none'; f.style.opacity=0.9; setTimeout(function(){ f.style.transition=''; f.style.opacity=0; },60); }
+function beginIntro(){ S.intro=1; S.it=0; ship.visible=false; hand.visible=false; $('cine').classList.remove('hidden'); }
+function landNow(){ S.intro=2; S.it=0; S.roll=0; $('fade').style.opacity=1; $('cine').classList.add('hidden'); setSub('Touchdown. Technically.'); sfx.boom(); }
+function stepOut(){
+  S.intro=3; S.it=0; ship.visible=true; hand.visible=true; setSub('');
+  S.px=SPAWN.x; S.pz=SPAWN.z; S.py=hAt(S.px,S.pz)+EYE; S.vy=0; S.grounded=true; S.yaw=0; S.pitch=-0.03; S.roll=0;
+  $('fade').style.opacity=0; $('hud').classList.remove('hidden'); toast('You made it out. The shuttle is making a funny noise...');
+}
+function updateIntro(dt){
+  S.it+=dt;
+  if(S.intro===1){
+    const u=Math.min(1,S.it/10), e=1-Math.pow(1-u,2.2), gy=shipParts.y, sh=0.008+0.05*u*u;
+    S.px=lerp(SHIP.x+30,SHIP.x,e)+(Math.random()-0.5)*sh*6; S.py=lerp(190,gy+3.2,e)+(Math.random()-0.5)*sh*6; S.pz=lerp(SHIP.z+260,SHIP.z-1,e);
+    S.yaw=0.1*(1-e)+(Math.random()-0.5)*sh; S.pitch=-0.42+0.32*e+(Math.random()-0.5)*sh; S.roll=Math.sin(S.it*2.1)*0.06*(1-u)+(Math.random()-0.5)*sh*1.5;
+    let t=''; for(let i=0;i<SUBS.length;i++) if(S.it>=SUBS[i][0]) t=SUBS[i][1]; setSub(t);
+    $('alt').textContent=Math.max(0,Math.round(S.py-gy-3.2));
+    $('cockpit').style.transform='translate('+((Math.random()-0.5)*sh*260).toFixed(1)+'px,'+((Math.random()-0.5)*sh*260).toFixed(1)+'px)';
+    S.rumbleT-=dt; if(S.rumbleT<=0){ S.rumbleT=0.22; sfx.rumble(); if(S.it>3.2) sfx.alarm(); }
+    if(u>=1) landNow();
+  } else if(S.intro===2){ if(S.it>2.4) stepOut(); }
+  else if(S.intro===3){
+    if(Math.random()<dt*5) sfx.spark();
+    if(S.it>7 || Math.hypot(S.px-SPAWN.x,S.pz-SPAWN.z)>5){ S.intro=4; S.it=0; toast('Uh-oh.', true); }
+  } else if(S.intro===4){
+    if(S.it<1.3){ ship.position.x=SHIP.x-0.6+(Math.random()-0.5)*0.14; if(Math.random()<dt*14) sfx.spark(); if(Math.random()<dt*5) sfx.alarm(); }
+    else if(!S.boomed){
+      S.boomed=true; ship.position.x=SHIP.x-0.6; sfx.boom(); flash(); S.kick=4;
+      const gy=shipParts.y+1.5;
+      for(let i=0;i<3;i++){ const ox=SHIP.x-4+i*4; const dx=S.px-ox, dz=S.pz-SHIP.z, l=Math.hypot(dx,dz)||1; spawnDebris(ox,gy,SHIP.z,dx/l,dz/l,18,true); spawnDust(ox,gy,SHIP.z,3,14); }
+    }
+    if(S.boomed){ S.wreck=Math.min(1,S.wreck+dt/0.7); applyShip();
+      if(S.it>3){ S.intro=5; showStory('<b>Your shuttle is wrecked.</b><br>All you saved from the cockpit is <b>one spoon</b>. But emergency power is still on: walk back up the ramp and <b>call Earth from the cockpit</b>.'); } }
+  }
+}
+
+const prevHud={p:''};
+function updatePrompt(){
+  let p='';
+  if(isActive() && S.intro>=3){
+    if(S.inside){ const st=nearStation(); if(st) p='<kbd>E</kbd>'+T(st.label); }
+    else if(nearShop()) p='<kbd>E</kbd>'+T('Enter Space Dust');
+    else if(S.mounted) p='';
+    else if(nearDepot()) p='<kbd>E</kbd>'+T('Parts Depot');
+    else if(nearNpc()) p='<kbd>E</kbd>'+T('Talk');
+    else { const v=nearVehicle(); if(v) p='<kbd>F</kbd>'+F('Get in the {0}', T(v.def.name)); }
+  }
+  if(p!==prevHud.p){ prevHud.p=p; ui.prompt.innerHTML=p; ui.prompt.classList.toggle('hidden',!p); }
+}
+function applyLang(){
+  const els=document.querySelectorAll('[data-t]'); for(let i=0;i<els.length;i++) els[i].innerHTML=T(els[i].getAttribute('data-t'));
+  $('keys').innerHTML=T('KEYS_HTML'); $('ctl').innerHTML=T('CTL_HTML');
+  $('lgEn').classList.toggle('on',LANG==='en'); $('lgTr').classList.toggle('on',LANG==='tr');
+  for(const k in last) delete last[k]; prevHud.p='~';
+  refreshStart(); renderToolbar(); drawSys(); drawCom(); setSub(S.subRaw);
+  if(S.storyKey) $('story').innerHTML=T(S.storyKey);
+  if(S.modal==='shop'){ renderShop(); $('quote').textContent=T(S.quoteRaw); } else if(S.modal) renderTerm();
+}
+function setLang(l){ LANG=l; try{ localStorage.setItem('marsLang',l); }catch(e){} applyLang(); }
+$('lgEn').addEventListener('click',function(e){ e.stopPropagation(); setLang('en'); });
+$('lgTr').addEventListener('click',function(e){ e.stopPropagation(); setLang('tr'); });
+
+function resize(){
+  const w=window.innerWidth, h=window.innerHeight;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); viewCam.aspect=w/h; viewCam.updateProjectionMatrix();
+}
+window.addEventListener('resize',resize); resize();
+
+S.py=hAt(S.px,S.pz)+EYE;
+equip(0);
+
+const tmpV=new THREE.Vector3();
+let prevT=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(0.05,(now-prevT)/1000); prevT=now; S.time+=dt;
+  const active=isActive();
+  const play = active && S.intro>=3;
+  if(S.warpT>0){ S.warpT-=dt; if(S.warpT<=0){ const wf=S.warpFn; S.warpFn=null; if(wf) wf(); $('fade').style.opacity=0; } }
+  if(active && S.intro>0 && S.intro<5) updateIntro(dt);
+  if(play){
+    if(S.inside) updateInside(dt); else if(!S.mounted) updatePlayer(dt);
+    S.cooldown-=dt;
+    const m=S.mounted, tl=m?m.def:TOOLS[S.tool];
+    if(tl.hold){                                                   // matkap, kırıcı, burgu aracı: basılı tutunca kazar
+      S.click=false; S.swingT=-1;
+      if(S.digging && S.cooldown<=0){ doDig(); S.cooldown=tl.cd; }
+    } else if(m){                                                  // kepçe: her tık tek, büyük ve yavaş kepçe
+      if(S.click && m.swingT<0){ S.click=false; m.swingT=0; m.hitDone=false; }
+      if(m.swingT>=0){ m.swingT+=dt/tl.cd; if(!m.hitDone && m.swingT>=0.45){ m.hitDone=true; doDig(); } if(m.swingT>=1) m.swingT=-1; }
+    } else {                                                       // diğer aletler: her tık tek vuruş
+      if(S.click && S.swingT<0){ S.click=false; S.swingT=0; S.hitDone=false; }
+      if(S.swingT>=0){
+        S.swingT+=dt/tl.cd;
+        if(!S.hitDone && S.swingT>=0.38){ S.hitDone=true; doDig(); }
+        if(S.swingT>=1) S.swingT=-1;
+      }
+    }
+    // amca arada bir laf atar
+    S.shoutT-=dt;
+    if(S.shoutT<=0 && S.intro>=5 && !S.inside && Math.hypot(S.px-SHOP.x,S.pz-SHOP.z)<16){ S.shoutT=24+Math.random()*16; toast(F('Shopkeeper: "{0}"', T(pick(QUOTES.shout)))); sfx.amca(); amcaTalk=1.4; }
+  }
+  for(let i=0;i<VEHS.length;i++) if(VEHS[i].owned) updateVehicle(VEHS[i], play?dt:0);
+  updateSmoke(dt); updateComms(); updateInstall(dt); if(!S.inside) updateMotes(dt);
+  for(let i=0;i<anims.length;i++) anims[i](S.time,dt);
+  bolt.talk=Math.max(0,bolt.talk-dt); tmpV.set(S.px,0,S.pz); colony.worldToLocal(tmpV);
+  bolt.head.rotation.y+=(Math.max(-1.3,Math.min(1.3,Math.atan2(tmpV.x+2,tmpV.z-5.2)))-bolt.head.rotation.y)*Math.min(1,dt*4); bolt.eye.scale.setScalar(bolt.talk>0?1+Math.sin(S.time*30)*0.35:1);
+  if(S.storyT>0){ S.storyT-=dt; if(S.storyT<=0) $('story').classList.add('hidden'); }
+
+  if(S.mounted && S.chase){ const cp=Math.cos(S.pitch), bx=S.px+Math.sin(S.yaw)*cp*11, bz=S.pz+Math.cos(S.yaw)*cp*11; camera.position.set(bx, Math.max(S.py+2.2-Math.sin(S.pitch)*11, hAt(bx,bz)+1.4), bz); }
+  else camera.position.set(S.px,S.py,S.pz);
+  camera.rotation.set(S.pitch+S.kick*0.012,S.yaw,S.roll);
+  body.visible=!S.mounted && !S.inside && S.intro>=3; body.position.set(S.px,S.py-EYE,S.pz); body.rotation.y=S.yaw;
+  sky.position.copy(camera.position); sky.userData.earth.rotation.y+=dt*0.01;
+  const lx=Math.round(S.px/4)*4, lz=Math.round(S.pz/4)*4;
+  sun.target.position.set(lx,0,lz); sun.position.set(lx+SUN_LIGHT.x*380, SUN_LIGHT.y*380, lz+SUN_LIGHT.z*380);
+
+  // el/alet animasyonu
+  S.swing=Math.max(0,S.swing-dt/0.26); S.clump=Math.max(0,S.clump-dt/0.5); S.kick=Math.max(0,S.kick-dt/0.16);
+  const TL=TOOLS[S.tool], hold=!!TL.hold, heavy=!!TL.heavy; let ang=0, push=0;
+  if(hold){ ang=-0.35; push=S.swing*(heavy?0.07:0.05); }
+  else if(S.swingT>=0){ const p=S.swingT;
+    if(p<0.2) ang=0.34*(p/0.2); else if(p<0.38) ang=0.34-1.34*((p-0.2)/0.18); else ang=-1.0*(1-smooth(0.38,1,p));
+    push=(p<0.38?smooth(0.15,0.38,p):1-smooth(0.38,1,p))*0.17; }
+  const jit=hold?S.swing*(heavy?0.03:0.012):0;
+  if(heavy){ hand.position.set((Math.random()-0.5)*jit, -0.46+Math.sin(S.bob)*0.02+(Math.random()-0.5)*jit, -0.5-push); hand.rotation.set(-1.8,0,0); }
+  else { hand.position.set(HAND_POS.x+(Math.random()-0.5)*jit, HAND_POS.y+Math.sin(S.bob)*0.014-push*0.25, HAND_POS.z-push); hand.rotation.set(-0.62+ang, -0.22, 0.16); }
+  if(toolSpin) toolSpin.rotation.y+=dt*(6+S.swing*40);
+  if(toolMesh){ const c=toolMesh.userData.clump; c.visible=S.clump>0.03; if(c.visible){ c.scale.setScalar(0.3+0.7*S.clump); c.rotation.y+=dt*3; }
+    if(toolMesh.userData.punch) toolMesh.userData.punch.position.y=S.swing*Math.sin(S.time*75)*0.035; }
+
+  // amca
+  amcaTalk=Math.max(0,amcaTalk-dt);
+  tmpV.set(S.px,0,S.pz); shop.worldToLocal(tmpV);
+  const look=Math.max(-1.3,Math.min(1.3,Math.atan2(tmpV.x-amca.root.position.x, tmpV.z-amca.root.position.z)));
+  amca.head.rotation.y+=(look-amca.head.rotation.y)*Math.min(1,dt*4);
+  amca.head.rotation.x=Math.sin(S.time*1.3)*0.04+(amcaTalk>0?Math.sin(S.time*22)*0.07:0);
+  amca.root.position.y=0.25+Math.sin(S.time*1.8)*0.012;
+  amca.armR.rotation.x=1.15+(amcaTalk>0?Math.sin(S.time*9)*0.25:0);
+
+  updateDust(dt); updateDebris(dt);
+  if(toastT>0){ toastT-=dt; if(toastT<=0) ui.toast.className='panel'; }
+  if(S.started){ updateHud(); updatePrompt(); }
+
+  renderer.clear();
+  renderer.render(scene,camera);
+  if(!S.mounted && !S.inside && S.intro>=3){ renderer.clearDepth(); renderer.render(viewScene,viewCam); }
+}
+requestAnimationFrame(frame);
+
+window.__mars = { T:T, setLang:setLang, i18nData:function(){ const o=[]; function add(x){ if(typeof x==='string') o.push(x); }
+    TOOLS.forEach(function(t){ add(t.name); add(t.desc); }); VDEFS.forEach(function(t){ add(t.name); add(t.desc); }); BAG_NAMES.forEach(add);
+    for(const k in QUOTES) QUOTES[k].forEach(add); for(const k in BOT) BOT[k].forEach(add);
+    PARTS.forEach(function(t){ add(t.name); add(t.desc); }); CONVO.concat(SMALLTALK).forEach(function(m){ add(m.label); add(m.text); add(m.reply); });
+    LOGS.forEach(add); NPC_LINES.forEach(function(a){ a.forEach(add); }); SUBS.forEach(function(q){ add(q[1]); }); STATIONS.forEach(function(q){ add(q.label); });
+    for(const k in EN) add(k); return o; }, S:S, VEHS:VEHS, landNow:landNow, interact:interact, sendMsg:sendMsg, buyPart:buyPart, installPart:installPart, launch:launch, CONVO:CONVO, INT:INT, COLONY:COLONY, SHIP:SHIP, PARTS:PARTS, openTerm:openTerm, openShop:openShop, closeShop:closeShop, placeVehicle:placeVehicle, mount:mount, doDig:doDig, equip:equip, hAt:hAt };
+S.ready=true; applyLang();
+}
+requestAnimationFrame(function(){ setTimeout(__marsMain, 60); });
+</script>
+</body>
+</html>
